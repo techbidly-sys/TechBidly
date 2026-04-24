@@ -18,6 +18,28 @@ export const conditions = ['Like New', 'Excellent', 'Good', 'Fair'];
 const now = Date.now();
 const hours = (h) => new Date(now + h * 3600 * 1000).toISOString();
 
+const authVerified = (score = 96) => ({
+  status: 'verified',
+  fraudScore: score,
+  checks: [
+    { label: 'Original photos', pass: true },
+    { label: 'No AI-generated images', pass: true },
+    { label: 'No stock photo match', pass: true },
+    { label: 'Metadata consistent', pass: true },
+  ],
+});
+
+const authWarning = (failLabel, score = 71) => ({
+  status: 'warning',
+  fraudScore: score,
+  checks: [
+    { label: 'Original photos', pass: failLabel !== 'Original photos' },
+    { label: 'No AI-generated images', pass: failLabel !== 'No AI-generated images' },
+    { label: 'No stock photo match', pass: failLabel !== 'No stock photo match' },
+    { label: 'Metadata consistent', pass: failLabel !== 'Metadata consistent' },
+  ],
+});
+
 export const listings = [
   {
     id: 'l-001',
@@ -36,6 +58,8 @@ export const listings = [
       'Used for 3 months, kept in a case with a screen protector since day one. Battery health 100%. Includes box, USB-C cable, and unused EarPods adapter.',
     tags: ['unlocked', 'battery 100%', 'box included'],
     featured: true,
+    auth: authVerified(97),
+    comparables: [975, 940, 910, 895, 862],
   },
   {
     id: 'l-002',
@@ -54,6 +78,8 @@ export const listings = [
       'AppleCare+ until 2026. Used as a secondary editing rig — fewer than 80 cycles on the battery. Ships in original box with 96W charger.',
     tags: ['AppleCare+', '<80 cycles', 'M3 Pro'],
     featured: true,
+    auth: authVerified(94),
+    comparables: [1950, 1880, 1840, 1790, 1750],
   },
   {
     id: 'l-003',
@@ -72,6 +98,8 @@ export const listings = [
       'Bundle includes Magic Keyboard (black) and 2nd-gen Apple Pencil. Used for digital art — no scratches on the screen, minor wear on keyboard corners.',
     tags: ['bundle', 'pencil included', 'wifi + cellular'],
     featured: true,
+    auth: authVerified(99),
+    comparables: [1220, 1190, 1155, 1110, 1080],
   },
   {
     id: 'l-004',
@@ -89,6 +117,8 @@ export const listings = [
     description:
       'Carrier unlocked. Comes with original box and a clear case. Minor micro-scratches on the back glass, screen is flawless.',
     tags: ['unlocked', 'clean IMEI'],
+    auth: authWarning('Metadata consistent', 68),
+    comparables: [590, 565, 548, 520, 498],
   },
   {
     id: 'l-005',
@@ -106,6 +136,8 @@ export const listings = [
     description:
       'Bought 6 weeks ago, switched back to iPhone. Includes S Pen, original box, and 2 unused screen protectors.',
     tags: ['dual sim', 'S Pen', '6 weeks old'],
+    auth: authVerified(92),
+    comparables: [930, 905, 882, 860, 835],
   },
   {
     id: 'l-006',
@@ -123,6 +155,8 @@ export const listings = [
     description:
       'Hard case included. Pads in great condition. Firmware updated to latest. Pairing reset before listing.',
     tags: ['noise cancelling', 'case included'],
+    auth: authWarning('No stock photo match', 72),
+    comparables: [260, 248, 238, 225, 210],
   },
   {
     id: 'l-007',
@@ -140,6 +174,8 @@ export const listings = [
     description:
       'Worn lightly for 2 months. No scratches on titanium case or sapphire crystal. Includes original packaging and charger.',
     tags: ['GPS + cellular', 'two months old'],
+    auth: authVerified(98),
+    comparables: [660, 640, 618, 600, 580],
   },
   {
     id: 'l-008',
@@ -157,6 +193,8 @@ export const listings = [
     description:
       'Light wear on palm rest. Battery cycles ~220. Works flawlessly. Comes with original Surface charger.',
     tags: ['Windows 11', 'i7-1255U'],
+    auth: authVerified(88),
+    comparables: [780, 755, 730, 710, 685],
   },
 ];
 

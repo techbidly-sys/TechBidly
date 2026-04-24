@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import {
   MapPin,
@@ -6,7 +6,6 @@ import {
   ShieldCheck,
   Heart,
   Share2,
-  Gavel,
   Sparkles,
   ChevronLeft,
   Info,
@@ -15,15 +14,13 @@ import {
 } from 'lucide-react';
 import { listings } from '../data/mockData.js';
 import CountdownTimer from '../components/CountdownTimer.jsx';
+import AuthBadge from '../components/AuthBadge.jsx';
+import SmartBidAgent from '../components/SmartBidAgent.jsx';
 
 export default function ListingDetail() {
   const { id } = useParams();
   const listing = listings.find((l) => l.id === id);
   if (!listing) return <Navigate to="/browse" replace />;
-
-  const minNext = listing.currentBid + 5;
-  const [bid, setBid] = useState(minNext);
-  const [placed, setPlaced] = useState(false);
 
   const recent = useMemo(
     () =>
@@ -34,14 +31,6 @@ export default function ListingDetail() {
       })),
     [listing.currentBid]
   );
-
-  const aiSuggestion = Math.round(listing.currentBid * 1.06);
-
-  const placeBid = (e) => {
-    e.preventDefault();
-    if (bid < minNext) return;
-    setPlaced(true);
-  };
 
   return (
     <div className="space-y-6">
@@ -81,7 +70,7 @@ export default function ListingDetail() {
           </div>
 
           <div className="card p-6">
-            <div className="flex items-center gap-2 text-xs">
+            <div className="flex items-center gap-2 text-xs flex-wrap">
               <span className="chip bg-brand-50 text-brand-700">{listing.condition}</span>
               <span className="chip bg-ink-50 text-ink-600 capitalize border border-ink-100">{listing.category}</span>
               {listing.tags.map((t) => (
@@ -94,6 +83,11 @@ export default function ListingDetail() {
               <span className="inline-flex items-center gap-1"><Star size={14} className="text-amber-500"/> {listing.rating} seller rating</span>
             </div>
             <p className="mt-4 text-ink-700 leading-relaxed">{listing.description}</p>
+            {listing.auth && (
+              <div className="mt-4">
+                <AuthBadge auth={listing.auth} size="md" />
+              </div>
+            )}
           </div>
 
           <div className="card p-6">
@@ -124,44 +118,9 @@ export default function ListingDetail() {
               <CountdownTimer endsAt={listing.endsAt} />
             </div>
 
-            {placed ? (
-              <div className="mt-5 rounded-xl bg-emerald-50 border border-emerald-200 p-4">
-                <div className="font-semibold text-emerald-800">Your bid is in.</div>
-                <div className="text-sm text-emerald-700">
-                  We'll notify you the moment you're outbid or the auction ends.
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={placeBid} className="mt-5 space-y-3">
-                <span className="label">Your max bid</span>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-500 font-semibold">$</span>
-                    <input
-                      type="number"
-                      value={bid}
-                      min={minNext}
-                      step={5}
-                      onChange={(e) => setBid(Number(e.target.value))}
-                      className="input pl-7 text-lg font-semibold"
-                    />
-                  </div>
-                  <button type="submit" className="btn-brand h-[46px] px-5">
-                    <Gavel size={16} /> Place bid
-                  </button>
-                </div>
-                <div className="flex items-center justify-between text-xs text-ink-500">
-                  <span>Min next bid: <b className="text-ink-900">${minNext}</b></span>
-                  <button
-                    type="button"
-                    onClick={() => setBid(aiSuggestion)}
-                    className="inline-flex items-center gap-1 text-brand-700 font-semibold hover:underline"
-                  >
-                    <Sparkles size={12} /> AI suggests ${aiSuggestion}
-                  </button>
-                </div>
-              </form>
-            )}
+            <div className="mt-5">
+              <SmartBidAgent listing={listing} />
+            </div>
 
             <div className="mt-5 grid grid-cols-3 gap-2 text-center">
               <Trust icon={ShieldCheck} label="Buyer protection" />
@@ -188,12 +147,12 @@ export default function ListingDetail() {
 
           <div className="card p-5 bg-mesh-1">
             <div className="flex items-center gap-2 text-brand-700 font-semibold text-sm">
-              <Sparkles size={14}/> Bidly AI tip
+              <Sparkles size={14}/> Bidly AI insight
             </div>
             <p className="text-sm text-ink-700 mt-2 leading-relaxed">
-              Similar listings in <b>{listing.location.split(',')[0]}</b> closed within
-              {' '}<b>${Math.round(listing.currentBid * 0.96)}–${Math.round(listing.currentBid * 1.12)}</b>{' '}
-              over the last 30 days. A max of <b>${aiSuggestion}</b> keeps you within the 75th percentile.
+              Listings in <b>{listing.location.split(',')[0]}</b> with this condition grade close
+              within <b>${Math.round(listing.currentBid * 0.96).toLocaleString()}–${Math.round(listing.currentBid * 1.12).toLocaleString()}</b> over 30 days.
+              Activate the Smart Bid Agent above to let AI snipe at the optimal moment.
             </p>
           </div>
         </div>

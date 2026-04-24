@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Sparkles, Upload, Tag, Wand2, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Tag, Wand2, CheckCircle2 } from 'lucide-react';
 import { categories, conditions } from '../data/mockData.js';
+import AIPhotoGrader from '../components/AIPhotoGrader.jsx';
 
 export default function Sell() {
   const [form, setForm] = useState({
@@ -64,22 +65,17 @@ export default function Sell() {
         </div>
 
         <div className="card p-6 space-y-5">
-          <div>
-            <span className="label">Photos</span>
-            <div className="grid grid-cols-4 gap-3">
-              <label className="aspect-square rounded-xl border-2 border-dashed border-ink-200 grid place-items-center cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition">
-                <div className="text-center text-ink-500">
-                  <Upload size={20} className="mx-auto" />
-                  <div className="text-[11px] mt-1 font-medium">Upload</div>
-                </div>
-                <input type="file" className="hidden" accept="image/*" multiple />
-              </label>
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="aspect-square rounded-xl bg-ink-100 border border-ink-200" />
-              ))}
-            </div>
-            <p className="text-[11px] text-ink-400 mt-2">First photo is the cover. Up to 8 images.</p>
-          </div>
+          <AIPhotoGrader
+            onApply={(result) =>
+              setForm((f) => ({
+                ...f,
+                title: f.title || result.title,
+                condition: result.condition,
+                startingBid: result.startingBid,
+                description: f.description || result.description,
+              }))
+            }
+          />
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>

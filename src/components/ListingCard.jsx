@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { MapPin, Heart, Gavel } from 'lucide-react';
 import CountdownTimer from './CountdownTimer.jsx';
+import AuthBadge from './AuthBadge.jsx';
 
 export default function ListingCard({ listing, variant = 'default' }) {
   if (variant === 'wide') {
@@ -61,6 +62,11 @@ export default function ListingCard({ listing, variant = 'default' }) {
         >
           <Heart size={15} />
         </button>
+        {listing.auth && (
+          <div className="absolute bottom-3 left-3">
+            <AuthBadge auth={listing.auth} size="sm" />
+          </div>
+        )}
       </div>
       <div className="p-4 flex-1 flex flex-col">
         <div className="flex items-center gap-2 text-[11px]">
