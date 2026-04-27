@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard,
+  Home,
   Search,
   Tag,
   PackageCheck,
@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 const links = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/browse', label: 'Browse', icon: Search },
   { to: '/sell', label: 'Sell an item', icon: Tag },
   { to: '/orders', label: 'Orders', icon: PackageCheck },

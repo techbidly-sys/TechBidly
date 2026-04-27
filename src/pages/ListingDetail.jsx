@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import {
   MapPin,
@@ -12,25 +12,81 @@ import {
   Truck,
   Lock,
 } from 'lucide-react';
-import { listings } from '../data/mockData.js';
 import CountdownTimer from '../components/CountdownTimer.jsx';
 import AuthBadge from '../components/AuthBadge.jsx';
 import SmartBidAgent from '../components/SmartBidAgent.jsx';
+import { fetchListingById } from '../lib/listings.js';
+import { fetchRecentBids } from '../lib/bids.js';
+import { supabase } from '../lib/supabase.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function ListingDetail() {
   const { id } = useParams();
-  const listing = listings.find((l) => l.id === id);
-  if (!listing) return <Navigate to="/browse" replace />;
+  const { session } = useAuth();
+  const [listing, setListing] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [recentBids, setRecentBids] = useState([]);
 
-  const recent = useMemo(
-    () =>
-      Array.from({ length: 5 }).map((_, i) => ({
-        anon: `Bidder #${(7421 + i * 37) % 9999}`,
-        amount: listing.currentBid - i * (5 + i * 2),
-        when: `${i === 0 ? 'just now' : `${i * 4 + 2}m ago`}`,
-      })),
-    [listing.currentBid]
-  );
+  useEffect(() => {
+    setLoading(true);
+    fetchListingById(id)
+      .then((data) => {
+        if (!data) setNotFound(true);
+        else setListing(data);
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
+
+    fetchRecentBids(id).then(setRecentBids).catch(console.error);
+  }, [id]);
+
+  // Real-time subscription — live current_bid + bid_count updates
+  useEffect(() => {
+    if (!id) return;
+    const channel = supabase
+      .channel(`listing-${id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'listings',
+        filter: `id=eq.${id}`,
+      }, (payload) => {
+        setListing((prev) => prev ? {
+          ...prev,
+          currentBid: Number(payload.new.current_bid),
+          bids: payload.new.bid_count,
+        } : prev);
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'bids',
+        filter: `listing_id=eq.${id}`,
+      }, () => {
+        fetchRecentBids(id).then(setRecentBids).catch(console.error);
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [id]);
+
+  // Keep minNext in sync when currentBid changes due to real-time
+  const recent = recentBids;
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-6 w-32 bg-ink-100 rounded-lg animate-pulse" />
+        <div className="grid lg:grid-cols-[1.2fr,1fr] gap-8">
+          <div className="card h-96 animate-pulse bg-ink-100" />
+          <div className="card h-96 animate-pulse bg-ink-100" />
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound || !listing) return <Navigate to="/browse" replace />;
 
   return (
     <div className="space-y-6">
@@ -119,7 +175,11 @@ export default function ListingDetail() {
             </div>
 
             <div className="mt-5">
-              <SmartBidAgent listing={listing} />
+              <SmartBidAgent
+                listing={listing}
+                buyerId={session?.user?.id}
+                onBidPlaced={() => fetchRecentBids(id).then(setRecentBids)}
+              />
             </div>
 
             <div className="mt-5 grid grid-cols-3 gap-2 text-center">
@@ -134,15 +194,19 @@ export default function ListingDetail() {
               <div className="font-semibold">Recent bids</div>
               <span className="text-xs text-ink-500">Last 5</span>
             </div>
-            <ul className="mt-3 divide-y divide-ink-100">
-              {recent.map((r, i) => (
-                <li key={i} className="flex items-center justify-between py-2.5 text-sm">
-                  <span className="text-ink-700">{r.anon}</span>
-                  <span className="font-semibold text-ink-900">${r.amount.toLocaleString()}</span>
-                  <span className="text-ink-400 text-xs w-20 text-right">{r.when}</span>
-                </li>
-              ))}
-            </ul>
+            {recent.length === 0 ? (
+              <p className="mt-3 text-sm text-ink-400">No bids yet — be the first!</p>
+            ) : (
+              <ul className="mt-3 divide-y divide-ink-100">
+                {recent.map((r, i) => (
+                  <li key={i} className="flex items-center justify-between py-2.5 text-sm">
+                    <span className="text-ink-700">{r.anon}</span>
+                    <span className="font-semibold text-ink-900">${r.amount.toLocaleString()}</span>
+                    <span className="text-ink-400 text-xs w-20 text-right">{r.when}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="card p-5 bg-mesh-1">

@@ -1,9 +1,15 @@
 import { useState } from 'react';
-import { Sparkles, Tag, Wand2, CheckCircle2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Sparkles, Tag, Wand2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { categories, conditions } from '../data/mockData.js';
 import AIPhotoGrader from '../components/AIPhotoGrader.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import { createListing } from '../lib/listings.js';
 
 export default function Sell() {
+  const { session, profile } = useAuth();
+  const navigate = useNavigate();
+
   const [form, setForm] = useState({
     title: '',
     category: 'phones',
@@ -11,21 +17,41 @@ export default function Sell() {
     startingBid: 200,
     duration: '3',
     description: '',
-    location: 'Toronto, Canada',
+    location: profile?.role === 'seller' ? '' : 'Toronto, Canada',
+    imageUrl: '',
+    tags: '',
   });
-  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(null);
+  const [error, setError] = useState('');
 
-  const update = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const aiDraft = () => {
     setForm((f) => ({
       ...f,
       title: f.title || 'iPhone 15 Pro Max — 256GB Natural Titanium',
-      description:
-        f.description ||
-        'Used for 3 months in a case with screen protector. Battery health 100%. Includes original box, USB-C cable, and unused EarPods adapter. Ships next-day with tracking and signature.',
+      description: f.description || 'Used for 3 months in a case with screen protector. Battery health 100%. Includes original box, USB-C cable, and unused EarPods adapter. Ships next-day with tracking and signature.',
       startingBid: f.startingBid || 600,
     }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const listing = await createListing({
+        sellerId: session.user.id,
+        sellerHandle: profile?.handle ?? 'Anonymous Seller',
+        form,
+      });
+      setSubmitted(listing);
+    } catch (err) {
+      setError(err.message ?? 'Failed to create listing. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -38,25 +64,30 @@ export default function Sell() {
         <p className="text-ink-500 mt-2">
           Your auction is now visible to verified buyers. We'll notify you on the first bid.
         </p>
-        <button
-          onClick={() => {
-            setSubmitted(false);
-            setForm({ ...form, title: '', description: '' });
-          }}
-          className="btn-primary mt-6"
-        >
-          List another item
-        </button>
+        <div className="flex justify-center gap-3 mt-6">
+          <button
+            onClick={() => navigate(`/listing/${submitted.id}`)}
+            className="btn-brand"
+          >
+            View listing
+          </button>
+          <button
+            onClick={() => {
+              setSubmitted(null);
+              setForm({ title: '', category: 'phones', condition: 'Like New', startingBid: 200, duration: '3', description: '', location: '', imageUrl: '', tags: '' });
+            }}
+            className="btn-outline"
+          >
+            List another
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="grid lg:grid-cols-[1fr,340px] gap-6">
-      <form
-        onSubmit={(e) => { e.preventDefault(); setSubmitted(true); }}
-        className="space-y-5"
-      >
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <h1 className="font-display text-3xl font-bold">Sell on TechBidly</h1>
           <p className="text-sm text-ink-500 mt-1">
@@ -98,13 +129,13 @@ export default function Sell() {
             </div>
             <div>
               <span className="label">Seller location</span>
-              <input value={form.location} onChange={update('location')} className="input" placeholder="City, Country" />
+              <input value={form.location} onChange={update('location')} className="input" placeholder="City, Country" required />
             </div>
             <div>
               <span className="label">Starting bid (USD)</span>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-500 font-semibold">$</span>
-                <input type="number" value={form.startingBid} onChange={update('startingBid')} min={1} className="input pl-7" />
+                <input type="number" value={form.startingBid} onChange={update('startingBid')} min={1} className="input pl-7" required />
               </div>
             </div>
             <div>
@@ -115,6 +146,14 @@ export default function Sell() {
                 <option value="5">5 days</option>
                 <option value="7">7 days</option>
               </select>
+            </div>
+            <div className="sm:col-span-2">
+              <span className="label">Image URL</span>
+              <input value={form.imageUrl} onChange={update('imageUrl')} className="input" placeholder="https://... (paste a photo URL)" />
+            </div>
+            <div className="sm:col-span-2">
+              <span className="label">Tags <span className="text-ink-400 font-normal normal-case">(comma separated)</span></span>
+              <input value={form.tags} onChange={update('tags')} className="input" placeholder="unlocked, battery 100%, box included" />
             </div>
           </div>
 
@@ -131,14 +170,22 @@ export default function Sell() {
               onChange={update('description')}
               className="input mt-2"
               placeholder="Be specific: condition, included accessories, battery health, original box, etc."
+              required
             />
           </div>
         </div>
 
+        {error && (
+          <div className="flex items-center gap-2 text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3">
+            <AlertCircle size={16} className="shrink-0" />
+            {error}
+          </div>
+        )}
+
         <div className="flex justify-end gap-2">
           <button type="button" className="btn-outline">Save draft</button>
-          <button type="submit" className="btn-brand">
-            <Tag size={16} /> Publish auction
+          <button type="submit" disabled={submitting} className="btn-brand disabled:opacity-60 disabled:cursor-not-allowed">
+            <Tag size={16} /> {submitting ? 'Publishing…' : 'Publish auction'}
           </button>
         </div>
       </form>

@@ -251,6 +251,54 @@ export const orders = [
   },
 ];
 
+export const notifications = [
+  {
+    id: 'n-1',
+    type: 'outbid',
+    read: false,
+    title: "You've been outbid",
+    body: 'iPhone 15 Pro Max — someone bid $1,180',
+    listingId: 'l-001',
+    time: '2 min ago',
+  },
+  {
+    id: 'n-2',
+    type: 'ending',
+    read: false,
+    title: 'Auction ending soon',
+    body: 'MacBook Pro M3 — ends in 47 minutes',
+    listingId: 'l-002',
+    time: '12 min ago',
+  },
+  {
+    id: 'n-3',
+    type: 'won',
+    read: false,
+    title: 'You won an auction!',
+    body: 'AirPods Pro (2nd Gen) — final price $178',
+    listingId: null,
+    time: '2 days ago',
+  },
+  {
+    id: 'n-4',
+    type: 'shipped',
+    read: true,
+    title: 'Order shipped',
+    body: 'TB-10238 is on its way — tracking available',
+    listingId: null,
+    time: '3 days ago',
+  },
+  {
+    id: 'n-5',
+    type: 'watchlist',
+    read: true,
+    title: 'Watchlist price drop',
+    body: 'Sony WH-1000XM5 dropped to $260',
+    listingId: 'l-006',
+    time: '5 days ago',
+  },
+];
+
 export const user = {
   handle: 'Anonymous Buyer #2047',
   joined: 'Jan 2025',

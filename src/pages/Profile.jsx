@@ -12,6 +12,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { user } from '../data/mockData.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const TABS = [
   { id: 'account', label: 'Account', icon: User },
@@ -22,6 +23,7 @@ const TABS = [
 ];
 
 export default function Profile() {
+  const { session, profile } = useAuth();
   const [sp, setSp] = useSearchParams();
   const initial = sp.get('tab') ?? 'account';
   const [tab, setTab] = useState(initial);
@@ -30,16 +32,23 @@ export default function Profile() {
     if (sp.get('tab') !== tab) setSp({ tab });
   }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handle = profile?.handle ?? user.handle;
+  const role = profile?.role ?? 'buyer';
+  const initial_letter = handle.charAt(0).toUpperCase();
+
   return (
     <div className="space-y-6">
       <header className="card p-6 flex items-center gap-5">
         <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-ink-900 to-ink-700 grid place-items-center text-white text-xl font-bold">
-          A
+          {initial_letter}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="font-display text-2xl font-bold">{user.handle}</h1>
+            <h1 className="font-display text-2xl font-bold">{handle}</h1>
             <span className="chip bg-emerald-50 text-emerald-700"><CheckCircle2 size={12}/> Verified</span>
+            <span className={`chip capitalize ${role === 'seller' ? 'bg-brand-50 text-brand-700' : 'bg-ink-100 text-ink-600'}`}>
+              {role}
+            </span>
           </div>
           <div className="text-sm text-ink-500 mt-0.5">
             Member since {user.joined} · ⭐ {user.rating} · {user.bidsWon} wins
@@ -67,7 +76,7 @@ export default function Profile() {
         </nav>
 
         <div className="space-y-5">
-          {tab === 'account' && <AccountTab />}
+          {tab === 'account' && <AccountTab email={session?.user?.email} handle={handle} role={role} />}
           {tab === 'billing' && <BillingTab />}
           {tab === 'shipping' && <ShippingTab />}
           {tab === 'security' && <SecurityTab />}
@@ -103,8 +112,13 @@ function Field({ label, value, hint }) {
   );
 }
 
-function AccountTab() {
+function AccountTab({ email, handle, role }) {
   const [reveal, setReveal] = useState(false);
+
+  const maskedEmail = email
+    ? email.replace(/^(.)(.*)(@.*)$/, (_, a, b, c) => a + '•'.repeat(Math.min(b.length, 5)) + c)
+    : user.account.email;
+
   return (
     <Card
       title="Account details"
@@ -112,19 +126,19 @@ function AccountTab() {
       action={<button className="btn-outline"><Pencil size={14}/> Edit</button>}
     >
       <div className="grid sm:grid-cols-2 gap-5">
-        <Field label="Public handle" value={user.account.pseudonym} hint="What other users see" />
+        <Field label="Public handle" value={handle} hint="What other users see" />
         <div>
           <span className="label">Email</span>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-ink-900">
-              {reveal ? 'b.user@techbidly.com' : user.account.email}
+              {reveal ? email : maskedEmail}
             </span>
             <button onClick={() => setReveal((v) => !v)} className="text-ink-500 hover:text-ink-900">
               {reveal ? <EyeOff size={14}/> : <Eye size={14}/>}
             </button>
           </div>
         </div>
-        <Field label="Locale" value={user.account.locale} />
+        <Field label="Account type" value={role === 'seller' ? 'Seller' : 'Buyer'} hint={role === 'seller' ? 'Can create listings' : 'Can place bids'} />
         <Field label="2-factor auth" value={user.account.twoFactor ? 'Enabled' : 'Disabled'} hint="Authenticator app" />
       </div>
     </Card>

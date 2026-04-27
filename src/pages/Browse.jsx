@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Filter, SlidersHorizontal, ArrowDownUp, Search } from 'lucide-react';
-import { listings, categories, conditions } from '../data/mockData.js';
+import { categories, conditions } from '../data/mockData.js';
 import ListingCard from '../components/ListingCard.jsx';
+import { fetchListings } from '../lib/listings.js';
 
 const SORTS = [
   { id: 'ending', label: 'Ending soon' },
@@ -17,7 +18,18 @@ export default function Browse() {
   const [condition, setCondition] = useState('any');
   const [sort, setSort] = useState('ending');
   const [maxPrice, setMaxPrice] = useState(2500);
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const q = sp.get('q') ?? '';
+
+  useEffect(() => {
+    setLoading(true);
+    fetchListings()
+      .then(setListings)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = useMemo(() => {
     let list = [...listings];
@@ -32,7 +44,7 @@ export default function Browse() {
       default: list.sort((a, b) => new Date(a.endsAt) - new Date(b.endsAt));
     }
     return list;
-  }, [category, condition, sort, q, maxPrice]);
+  }, [listings, category, condition, sort, q, maxPrice]);
 
   return (
     <div className="space-y-6">
@@ -40,8 +52,8 @@ export default function Browse() {
         <div>
           <h1 className="font-display text-3xl font-bold">Browse auctions</h1>
           <p className="text-sm text-ink-500 mt-1">
-            {filtered.length} active listing{filtered.length === 1 ? '' : 's'}
-            {q ? ` matching “${q}”` : ''} · all sellers verified anonymous.
+            {loading ? 'Loading…' : `${filtered.length} active listing${filtered.length === 1 ? '' : 's'}`}
+            {q ? ` matching "${q}"` : ''} · all sellers verified anonymous.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -88,12 +100,7 @@ export default function Browse() {
               <span className="label">Search</span>
               <div className="flex items-center justify-between rounded-xl border border-ink-200 px-3 py-2 text-sm">
                 <span className="inline-flex items-center gap-1.5 text-ink-700"><Search size={12}/> {q}</span>
-                <button
-                  onClick={() => setSp({})}
-                  className="text-xs text-brand-700 font-semibold"
-                >
-                  Clear
-                </button>
+                <button onClick={() => setSp({})} className="text-xs text-brand-700 font-semibold">Clear</button>
               </div>
             </div>
           )}
@@ -120,10 +127,7 @@ export default function Browse() {
           <div>
             <span className="label">Max bid</span>
             <input
-              type="range"
-              min={100}
-              max={2500}
-              step={50}
+              type="range" min={100} max={2500} step={50}
               value={maxPrice}
               onChange={(e) => setMaxPrice(Number(e.target.value))}
               className="w-full accent-brand-600"
@@ -136,12 +140,7 @@ export default function Browse() {
           </div>
 
           <button
-            onClick={() => {
-              setCategory('all');
-              setCondition('any');
-              setMaxPrice(2500);
-              setSp({});
-            }}
+            onClick={() => { setCategory('all'); setCondition('any'); setMaxPrice(2500); setSp({}); }}
             className="btn-outline w-full"
           >
             <Filter size={14} /> Reset filters
@@ -149,7 +148,18 @@ export default function Browse() {
         </aside>
 
         <div>
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="card h-72 animate-pulse bg-ink-100" />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="card p-12 text-center">
+              <div className="text-rose-600 font-semibold">Failed to load listings</div>
+              <div className="text-sm text-ink-500 mt-1">{error}</div>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="card p-12 text-center">
               <div className="text-ink-900 font-semibold">No matching auctions</div>
               <div className="text-sm text-ink-500 mt-1">Try adjusting your filters or search.</div>

@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import { insertBid } from '../lib/bids.js';
 
 const STRATEGIES = [
   {
@@ -47,15 +48,17 @@ function winProbability(maxBid, currentBid, comparables) {
   return Math.min(95, Math.max(2, Math.round(raw)));
 }
 
-export default function SmartBidAgent({ listing, onBidPlaced }) {
+export default function SmartBidAgent({ listing, buyerId, onBidPlaced }) {
   const minNext = listing.currentBid + 5;
   const [maxBid, setMaxBid] = useState(Math.round(listing.currentBid * 1.07));
   const [strategy, setStrategy] = useState('sniper');
   const [mode, setMode] = useState('manual'); // manual | setup | armed
   const [showComps, setShowComps] = useState(false);
-  const [agentStatus, setAgentStatus] = useState('leading'); // leading | outbid | monitoring
+  const [agentStatus, setAgentStatus] = useState('leading');
   const [manualBid, setManualBid] = useState(minNext);
   const [placed, setPlaced] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [bidError, setBidError] = useState('');
 
   const prob = winProbability(maxBid, listing.currentBid, listing.comparables ?? []);
   const aiSuggestion = Math.round(listing.comparables?.[1] ?? listing.currentBid * 1.06);
@@ -78,11 +81,20 @@ export default function SmartBidAgent({ listing, onBidPlaced }) {
     setAgentStatus('leading');
   };
 
-  const placeBid = (e) => {
+  const placeBid = async (e) => {
     e.preventDefault();
-    if (manualBid < minNext) return;
-    setPlaced(true);
-    onBidPlaced?.();
+    if (manualBid < minNext || !buyerId) return;
+    setBidError('');
+    setSubmitting(true);
+    try {
+      await insertBid(listing.id, buyerId, manualBid);
+      setPlaced(true);
+      onBidPlaced?.();
+    } catch (err) {
+      setBidError(err.message ?? 'Failed to place bid. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (placed) {
@@ -117,10 +129,19 @@ export default function SmartBidAgent({ listing, onBidPlaced }) {
               className="input pl-7 text-lg font-semibold"
             />
           </div>
-          <button type="submit" className="btn-brand h-[46px] px-5 whitespace-nowrap">
-            <Gavel size={16} /> Place bid
+          <button
+            type="submit"
+            disabled={submitting || manualBid < minNext}
+            className="btn-brand h-[46px] px-5 whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <Gavel size={16} /> {submitting ? 'Placing…' : 'Place bid'}
           </button>
         </div>
+        {bidError && (
+          <p className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
+            {bidError}
+          </p>
+        )}
         <div className="flex items-center justify-between text-xs text-ink-500">
           <span>Min next bid: <b className="text-ink-900">${minNext}</b></span>
           <button
