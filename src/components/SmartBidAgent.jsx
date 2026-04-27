@@ -17,7 +17,6 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { insertBid } from '@/lib/bids.js';
 
 const STRATEGIES = [
   {
@@ -50,7 +49,7 @@ function winProbability(maxBid, currentBid, comparables) {
   return Math.min(95, Math.max(2, Math.round(raw)));
 }
 
-export default function SmartBidAgent({ listing, buyerId, onBidPlaced }) {
+export default function SmartBidAgent({ listing, onBidPlaced }) {
   const minNext = listing.currentBid + 5;
   const [maxBid, setMaxBid] = useState(Math.round(listing.currentBid * 1.07));
   const [strategy, setStrategy] = useState('sniper');
@@ -85,11 +84,17 @@ export default function SmartBidAgent({ listing, buyerId, onBidPlaced }) {
 
   const placeBid = async (e) => {
     e.preventDefault();
-    if (manualBid < minNext || !buyerId) return;
+    if (manualBid < minNext) return;
     setBidError('');
     setSubmitting(true);
     try {
-      await insertBid(listing.id, buyerId, manualBid);
+      const res = await fetch('/api/bids/place', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId: listing.id, amount: manualBid }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Failed to place bid. Please try again.');
       setPlaced(true);
       onBidPlaced?.();
     } catch (err) {
