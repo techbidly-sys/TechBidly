@@ -1,6 +1,8 @@
+'use client';
+
 import { Heart } from 'lucide-react';
-import { listings } from '../data/mockData.js';
-import ListingCard from '../components/ListingCard.jsx';
+import { listings } from '@/data/mockData.js';
+import ListingCard from '@/components/ListingCard.jsx';
 
 export default function Watchlist() {
   const items = listings.slice(0, 6);

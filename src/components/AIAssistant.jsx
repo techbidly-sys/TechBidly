@@ -1,3 +1,5 @@
+'use client';
+
 import { useEffect, useRef, useState } from 'react';
 import { Sparkles, Send, X, Wand2 } from 'lucide-react';
 

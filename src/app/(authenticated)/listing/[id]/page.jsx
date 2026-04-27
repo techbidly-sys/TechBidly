@@ -1,5 +1,8 @@
+'use client';
+
 import { useEffect, useState } from 'react';
-import { Link, useParams, Navigate } from 'react-router-dom';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   MapPin,
   Star,
@@ -12,16 +15,17 @@ import {
   Truck,
   Lock,
 } from 'lucide-react';
-import CountdownTimer from '../components/CountdownTimer.jsx';
-import AuthBadge from '../components/AuthBadge.jsx';
-import SmartBidAgent from '../components/SmartBidAgent.jsx';
-import { fetchListingById } from '../lib/listings.js';
-import { fetchRecentBids } from '../lib/bids.js';
-import { supabase } from '../lib/supabase.js';
-import { useAuth } from '../context/AuthContext.jsx';
+import CountdownTimer from '@/components/CountdownTimer.jsx';
+import AuthBadge from '@/components/AuthBadge.jsx';
+import SmartBidAgent from '@/components/SmartBidAgent.jsx';
+import { fetchListingById } from '@/lib/listings.js';
+import { fetchRecentBids } from '@/lib/bids.js';
+import { supabase } from '@/lib/supabase.js';
+import { useAuth } from '@/context/AuthContext.jsx';
 
 export default function ListingDetail() {
   const { id } = useParams();
+  const router = useRouter();
   const { session } = useAuth();
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -41,7 +45,10 @@ export default function ListingDetail() {
     fetchRecentBids(id).then(setRecentBids).catch(console.error);
   }, [id]);
 
-  // Real-time subscription — live current_bid + bid_count updates
+  useEffect(() => {
+    if (notFound) router.replace('/browse');
+  }, [notFound, router]);
+
   useEffect(() => {
     if (!id) return;
     const channel = supabase
@@ -71,7 +78,6 @@ export default function ListingDetail() {
     return () => supabase.removeChannel(channel);
   }, [id]);
 
-  // Keep minNext in sync when currentBid changes due to real-time
   const recent = recentBids;
 
   if (loading) {
@@ -86,16 +92,15 @@ export default function ListingDetail() {
     );
   }
 
-  if (notFound || !listing) return <Navigate to="/browse" replace />;
+  if (notFound || !listing) return null;
 
   return (
     <div className="space-y-6">
-      <Link to="/browse" className="inline-flex items-center gap-1 text-sm font-semibold text-ink-600 hover:text-ink-900">
+      <Link href="/browse" className="inline-flex items-center gap-1 text-sm font-semibold text-ink-600 hover:text-ink-900">
         <ChevronLeft size={16} /> Back to browse
       </Link>
 
       <div className="grid lg:grid-cols-[1.2fr,1fr] gap-8">
-        {/* Gallery + details */}
         <div className="space-y-5">
           <div className="card overflow-hidden">
             <div className="aspect-[4/3] bg-ink-100 relative">
@@ -158,7 +163,6 @@ export default function ListingDetail() {
           </div>
         </div>
 
-        {/* Bid panel */}
         <div className="space-y-5 lg:sticky lg:top-20 self-start">
           <div className="card p-6">
             <div className="flex items-end justify-between">

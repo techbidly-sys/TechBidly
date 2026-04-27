@@ -1,9 +1,11 @@
+'use client';
+
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Filter, SlidersHorizontal, ArrowDownUp, Search } from 'lucide-react';
-import { categories, conditions } from '../data/mockData.js';
-import ListingCard from '../components/ListingCard.jsx';
-import { fetchListings } from '../lib/listings.js';
+import { categories, conditions } from '@/data/mockData.js';
+import ListingCard from '@/components/ListingCard.jsx';
+import { fetchListings } from '@/lib/listings.js';
 
 const SORTS = [
   { id: 'ending', label: 'Ending soon' },
@@ -13,7 +15,8 @@ const SORTS = [
 ];
 
 export default function Browse() {
-  const [sp, setSp] = useSearchParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [category, setCategory] = useState('all');
   const [condition, setCondition] = useState('any');
   const [sort, setSort] = useState('ending');
@@ -21,7 +24,7 @@ export default function Browse() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const q = sp.get('q') ?? '';
+  const q = searchParams.get('q') ?? '';
 
   useEffect(() => {
     setLoading(true);
@@ -30,6 +33,8 @@ export default function Browse() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const clearSearch = () => router.replace('/browse');
 
   const filtered = useMemo(() => {
     let list = [...listings];
@@ -72,7 +77,6 @@ export default function Browse() {
         </div>
       </div>
 
-      {/* Category pills */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {categories.map((c) => (
           <button
@@ -100,7 +104,7 @@ export default function Browse() {
               <span className="label">Search</span>
               <div className="flex items-center justify-between rounded-xl border border-ink-200 px-3 py-2 text-sm">
                 <span className="inline-flex items-center gap-1.5 text-ink-700"><Search size={12}/> {q}</span>
-                <button onClick={() => setSp({})} className="text-xs text-brand-700 font-semibold">Clear</button>
+                <button onClick={clearSearch} className="text-xs text-brand-700 font-semibold">Clear</button>
               </div>
             </div>
           )}
@@ -140,7 +144,7 @@ export default function Browse() {
           </div>
 
           <button
-            onClick={() => { setCategory('all'); setCondition('any'); setMaxPrice(2500); setSp({}); }}
+            onClick={() => { setCategory('all'); setCondition('any'); setMaxPrice(2500); clearSearch(); }}
             className="btn-outline w-full"
           >
             <Filter size={14} /> Reset filters

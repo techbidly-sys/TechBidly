@@ -1,5 +1,7 @@
+'use client';
+
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   User,
   CreditCard,
@@ -11,8 +13,8 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { user } from '../data/mockData.js';
-import { useAuth } from '../context/AuthContext.jsx';
+import { user } from '@/data/mockData.js';
+import { useAuth } from '@/context/AuthContext.jsx';
 
 const TABS = [
   { id: 'account', label: 'Account', icon: User },
@@ -24,12 +26,15 @@ const TABS = [
 
 export default function Profile() {
   const { session, profile } = useAuth();
-  const [sp, setSp] = useSearchParams();
-  const initial = sp.get('tab') ?? 'account';
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const initial = searchParams.get('tab') ?? 'account';
   const [tab, setTab] = useState(initial);
 
   useEffect(() => {
-    if (sp.get('tab') !== tab) setSp({ tab });
+    if (searchParams.get('tab') !== tab) {
+      router.replace(`/profile?tab=${tab}`);
+    }
   }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handle = profile?.handle ?? user.handle;

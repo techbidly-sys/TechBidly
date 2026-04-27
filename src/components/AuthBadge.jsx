@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import { ShieldCheck, ShieldAlert, Shield, CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 

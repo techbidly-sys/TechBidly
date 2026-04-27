@@ -1,9 +1,8 @@
-import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar.jsx';
 import TopBar from './TopBar.jsx';
 import AIAssistant from './AIAssistant.jsx';
 
-export default function Layout() {
+export default function Layout({ children }) {
   return (
     <div className="min-h-screen flex bg-ink-50">
       <Sidebar />
@@ -11,7 +10,7 @@ export default function Layout() {
         <TopBar />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-7xl px-6 lg:px-10 py-8">
-            <Outlet />
+            {children}
           </div>
         </main>
       </div>

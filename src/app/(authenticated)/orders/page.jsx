@@ -1,6 +1,8 @@
+'use client';
+
 import { useState } from 'react';
 import { MapPin, Package, ChevronRight, Truck, Clock, CheckCircle2 } from 'lucide-react';
-import { orders } from '../data/mockData.js';
+import { orders } from '@/data/mockData.js';
 
 const TABS = [
   { id: 'active', label: 'Active' },

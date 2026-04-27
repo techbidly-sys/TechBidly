@@ -1,19 +1,41 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { LogIn, Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '../context/AuthContext.jsx';
+'use client';
 
-export default function Login() {
-  const { signIn } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const from = location.state?.from?.pathname ?? '/';
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { LogIn, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext.jsx';
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginFallback() {
+  return (
+    <div className="min-h-screen bg-ink-50 flex items-center justify-center">
+      <div className="h-8 w-8 rounded-full border-2 border-brand-600 border-t-transparent animate-spin" />
+    </div>
+  );
+}
+
+function LoginForm() {
+  const { signIn, session } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const from = searchParams.get('from') ?? '/';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (session) router.replace(from);
+  }, [session, from, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,7 +46,7 @@ export default function Login() {
     if (error) {
       setError(error.message);
     } else {
-      navigate(from, { replace: true });
+      router.replace(from);
     }
   };
 

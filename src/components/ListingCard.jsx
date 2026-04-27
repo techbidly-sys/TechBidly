@@ -1,4 +1,6 @@
-import { Link } from 'react-router-dom';
+'use client';
+
+import Link from 'next/link';
 import { MapPin, Heart, Gavel } from 'lucide-react';
 import CountdownTimer from './CountdownTimer.jsx';
 import AuthBadge from './AuthBadge.jsx';
@@ -7,7 +9,7 @@ export default function ListingCard({ listing, variant = 'default' }) {
   if (variant === 'wide') {
     return (
       <Link
-        to={`/listing/${listing.id}`}
+        href={`/listing/${listing.id}`}
         className="group card overflow-hidden flex flex-col sm:flex-row hover:shadow-glow hover:-translate-y-0.5 transition"
       >
         <div className="relative sm:w-56 aspect-[4/3] sm:aspect-auto bg-ink-100">
@@ -42,7 +44,7 @@ export default function ListingCard({ listing, variant = 'default' }) {
 
   return (
     <Link
-      to={`/listing/${listing.id}`}
+      href={`/listing/${listing.id}`}
       className="group card overflow-hidden flex flex-col hover:shadow-glow hover:-translate-y-1 transition"
     >
       <div className="relative aspect-[4/3] bg-ink-100 overflow-hidden">

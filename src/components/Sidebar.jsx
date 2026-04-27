@@ -1,4 +1,7 @@
-import { NavLink } from 'react-router-dom';
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   Home,
   Search,
@@ -9,7 +12,7 @@ import {
 } from 'lucide-react';
 
 const links = [
-  { to: '/', label: 'Home', icon: Home, end: true },
+  { to: '/', label: 'Home', icon: Home, exact: true },
   { to: '/browse', label: 'Browse', icon: Search },
   { to: '/sell', label: 'Sell an item', icon: Tag },
   { to: '/orders', label: 'Orders', icon: PackageCheck },
@@ -17,25 +20,27 @@ const links = [
 ];
 
 export default function Sidebar() {
+  const pathname = usePathname();
+
   return (
     <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-100 bg-white">
       <div className="px-6 pt-6 pb-4">
         <Logo />
       </div>
       <nav className="flex-1 px-3 space-y-1">
-        {links.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              `nav-link ${isActive ? 'active' : ''}`
-            }
-          >
-            <Icon className="h-4.5 w-4.5" size={18} />
-            <span>{label}</span>
-          </NavLink>
-        ))}
+        {links.map(({ to, label, icon: Icon, exact }) => {
+          const isActive = exact ? pathname === to : pathname.startsWith(to);
+          return (
+            <Link
+              key={to}
+              href={to}
+              className={`nav-link ${isActive ? 'active' : ''}`}
+            >
+              <Icon className="h-4.5 w-4.5" size={18} />
+              <span>{label}</span>
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="m-3 rounded-2xl p-4 bg-mesh-1 border border-ink-100">

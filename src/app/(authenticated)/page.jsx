@@ -1,5 +1,7 @@
+'use client';
+
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import {
   TrendingUp,
   Gavel,
@@ -10,10 +12,10 @@ import {
   Flame,
   ShieldCheck,
 } from 'lucide-react';
-import { user } from '../data/mockData.js';
-import { useAuth } from '../context/AuthContext.jsx';
-import { fetchListings } from '../lib/listings.js';
-import ListingCard from '../components/ListingCard.jsx';
+import { user } from '@/data/mockData.js';
+import { useAuth } from '@/context/AuthContext.jsx';
+import { fetchListings } from '@/lib/listings.js';
+import ListingCard from '@/components/ListingCard.jsx';
 
 export default function Home() {
   const { profile } = useAuth();
@@ -36,7 +38,6 @@ export default function Home() {
 
   return (
     <div className="space-y-10">
-      {/* Hero */}
       <section className="relative overflow-hidden rounded-3xl bg-ink-900 text-white p-8 lg:p-10">
         <div className="absolute inset-0 bg-mesh-1 opacity-70" />
         <div className="absolute -top-16 -right-16 h-64 w-64 rounded-full bg-brand-500/30 blur-3xl" />
@@ -56,10 +57,10 @@ export default function Home() {
               <span className="text-white font-semibold">{endingSoon.length} auctions ending soon</span> in your watchlist.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              <Link to="/browse" className="btn-brand">
+              <Link href="/browse" className="btn-brand">
                 Explore auctions <ArrowRight size={16} />
               </Link>
-              <Link to="/sell" className="btn bg-white/10 text-white hover:bg-white/15 border border-white/15 backdrop-blur">
+              <Link href="/sell" className="btn bg-white/10 text-white hover:bg-white/15 border border-white/15 backdrop-blur">
                 Sell something
               </Link>
             </div>
@@ -82,7 +83,6 @@ export default function Home() {
         </div>
       ) : (
         <>
-          {/* Featured */}
           {featured.length > 0 && (
             <section>
               <SectionHeader
@@ -97,7 +97,6 @@ export default function Home() {
             </section>
           )}
 
-          {/* For you */}
           {forYou.length > 0 && (
             <section>
               <SectionHeader
@@ -112,7 +111,6 @@ export default function Home() {
             </section>
           )}
 
-          {/* Ending soon + AI tip */}
           {endingSoon.length > 0 && (
             <section className="grid lg:grid-cols-3 gap-5">
               <div className="lg:col-span-2 space-y-3">
@@ -180,7 +178,7 @@ function SectionHeader({ eyebrow, title, subtitle, link }) {
         {subtitle && <p className="text-sm text-ink-500 mt-1">{subtitle}</p>}
       </div>
       {link && (
-        <Link to={link} className="text-sm font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
+        <Link href={link} className="text-sm font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
           See all <ArrowRight size={14} />
         </Link>
       )}

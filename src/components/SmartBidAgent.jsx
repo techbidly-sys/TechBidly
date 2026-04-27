@@ -1,3 +1,5 @@
+'use client';
+
 import { useEffect, useState } from 'react';
 import {
   Bot,
@@ -15,7 +17,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { insertBid } from '../lib/bids.js';
+import { insertBid } from '@/lib/bids.js';
 
 const STRATEGIES = [
   {

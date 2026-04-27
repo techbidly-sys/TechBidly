@@ -1,14 +1,16 @@
+'use client';
+
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { Sparkles, Tag, Wand2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { categories, conditions } from '../data/mockData.js';
-import AIPhotoGrader from '../components/AIPhotoGrader.jsx';
-import { useAuth } from '../context/AuthContext.jsx';
-import { createListing } from '../lib/listings.js';
+import { categories, conditions } from '@/data/mockData.js';
+import AIPhotoGrader from '@/components/AIPhotoGrader.jsx';
+import { useAuth } from '@/context/AuthContext.jsx';
+import { createListing } from '@/lib/listings.js';
 
 export default function Sell() {
   const { session, profile } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const [form, setForm] = useState({
     title: '',
@@ -66,7 +68,7 @@ export default function Sell() {
         </p>
         <div className="flex justify-center gap-3 mt-6">
           <button
-            onClick={() => navigate(`/listing/${submitted.id}`)}
+            onClick={() => router.push(`/listing/${submitted.id}`)}
             className="btn-brand"
           >
             View listing

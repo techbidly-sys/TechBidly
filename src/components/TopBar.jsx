@@ -1,5 +1,8 @@
+'use client';
+
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   Bell,
@@ -16,16 +19,16 @@ import {
   Package,
   Heart,
 } from 'lucide-react';
-import { user, notifications as mockNotifications } from '../data/mockData.js';
+import { user, notifications as mockNotifications } from '@/data/mockData.js';
 import { Logo } from './Sidebar.jsx';
-import { useAuth } from '../context/AuthContext.jsx';
+import { useAuth } from '@/context/AuthContext.jsx';
 
 export default function TopBar() {
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState(mockNotifications);
   const [query, setQuery] = useState('');
-  const navigate = useNavigate();
+  const router = useRouter();
   const ref = useRef(null);
   const notifRef = useRef(null);
 
@@ -45,7 +48,7 @@ export default function TopBar() {
 
   const submitSearch = (e) => {
     e.preventDefault();
-    navigate(`/browse${query ? `?q=${encodeURIComponent(query)}` : ''}`);
+    router.push(`/browse${query ? `?q=${encodeURIComponent(query)}` : ''}`);
   };
 
   return (
@@ -212,7 +215,7 @@ function ProfileMenu({ onClose }) {
         {items.map((it) => (
           <Link
             key={it.label}
-            to={it.to}
+            href={it.to}
             onClick={onClose}
             className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-ink-50 transition"
           >
