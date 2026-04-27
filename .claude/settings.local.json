@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:innovation.ebayinc.com)",
+      "WebFetch(domain:www.incognia.com)",
+      "Bash(npx vite *)"
+    ]
+  }
+}
