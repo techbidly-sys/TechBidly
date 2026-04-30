@@ -22,6 +22,7 @@ import BidHistoryChart from '@/components/BidHistoryChart.jsx';
 import { fetchListingById } from '@/lib/listings.js';
 import { fetchRecentBids } from '@/lib/bids.js';
 import { supabase } from '@/lib/supabase.js';
+import { isListingWatchlisted, toggleListingWatchlist } from '@/lib/watchlist.js';
 import { useAuth } from '@/context/AuthContext.jsx';
 
 export default function ListingDetail() {
@@ -32,6 +33,9 @@ export default function ListingDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [recentBids, setRecentBids] = useState([]);
+  const [isWatchlisted, setIsWatchlisted] = useState(false);
+  const [auctionResult, setAuctionResult] = useState(null);
+  const [nowTs, setNowTs] = useState(Date.now());
 
   useEffect(() => {
     setLoading(true);
@@ -79,6 +83,30 @@ export default function ListingDetail() {
     return () => supabase.removeChannel(channel);
   }, [id]);
 
+  useEffect(() => {
+    const timer = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/listings/${id}/winner`)
+      .then((res) => res.json())
+      .then((data) => {
+        setAuctionResult(data?.ended ? data.result : null);
+      })
+      .catch(() => setAuctionResult(null));
+  }, [id, listing?.currentBid, listing?.status]);
+
+  useEffect(() => {
+    if (!id) return;
+    setIsWatchlisted(isListingWatchlisted(id));
+  }, [id]);
+
+  const handleToggleWatchlist = () => {
+    setIsWatchlisted(toggleListingWatchlist(id));
+  };
+
   const recent = recentBids;
 
   if (loading) {
@@ -94,6 +122,9 @@ export default function ListingDetail() {
   }
 
   if (notFound || !listing) return null;
+
+  const hasEnded = (listing.endsAt ? new Date(listing.endsAt).getTime() <= nowTs : false)
+    || (listing.status && listing.status !== 'active');
 
   return (
     <div className="space-y-6">
@@ -114,8 +145,14 @@ export default function ListingDetail() {
                 <CountdownTimer endsAt={listing.endsAt} />
               </div>
               <div className="absolute top-4 right-4 flex gap-2">
-                <button className="h-9 w-9 grid place-items-center rounded-full bg-white/90 backdrop-blur hover:text-rose-500 transition" aria-label="Watch">
-                  <Heart size={16} />
+                <button
+                  onClick={handleToggleWatchlist}
+                  className={`h-9 w-9 grid place-items-center rounded-full bg-white/90 backdrop-blur transition ${
+                    isWatchlisted ? 'text-rose-500' : 'hover:text-rose-500'
+                  }`}
+                  aria-label={isWatchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
+                >
+                  <Heart size={16} className={isWatchlisted ? 'fill-current' : ''} />
                 </button>
                 <button className="h-9 w-9 grid place-items-center rounded-full bg-white/90 backdrop-blur hover:text-brand-600 transition" aria-label="Share">
                   <Share2 size={16} />
@@ -190,6 +227,8 @@ export default function ListingDetail() {
                 listing={listing}
                 buyerId={session?.user?.id}
                 onBidPlaced={() => fetchRecentBids(id).then(setRecentBids)}
+                auctionEnded={hasEnded}
+                auctionResult={auctionResult}
               />
             </div>
 
@@ -202,11 +241,18 @@ export default function ListingDetail() {
 
           <div className="card p-6">
             <div className="flex items-center justify-between">
-              <div className="font-semibold">Recent bids</div>
-              <span className="text-xs text-ink-500">Last 5</span>
+              <div className="font-semibold">{hasEnded ? 'Final bids' : 'Recent bids'}</div>
+              <span className="text-xs text-ink-500">{hasEnded ? 'Auction closed' : 'Last 5'}</span>
             </div>
+            {hasEnded && auctionResult && (
+              <div className="mt-3 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2.5 text-sm text-ink-700">
+                Auction ended at <span className="font-semibold text-ink-900">${Number(auctionResult.finalBid ?? listing.currentBid).toLocaleString()}</span>
+                {' · '}
+                Winner: <span className="font-semibold text-ink-900">{auctionResult.winnerDisplay ?? 'Anonymous Buyer'}</span>
+              </div>
+            )}
             {recent.length === 0 ? (
-              <p className="mt-3 text-sm text-ink-400">No bids yet — be the first!</p>
+              <p className="mt-3 text-sm text-ink-400">{hasEnded ? 'No bids were placed before close.' : 'No bids yet — be the first!'}</p>
             ) : (
               <ul className="mt-3 divide-y divide-ink-100">
                 {recent.map((r, i) => (

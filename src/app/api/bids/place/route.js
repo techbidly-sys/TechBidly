@@ -55,6 +55,22 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Invalid bid amount' }, { status: 400 });
   }
 
+  const { data: listing, error: listingError } = await supabaseAdmin
+    .from('listings')
+    .select('id, ends_at, status')
+    .eq('id', Number(listingId))
+    .maybeSingle();
+
+  if (listingError || !listing) {
+    return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+  }
+
+  const endedByTime = listing.ends_at ? new Date(listing.ends_at).getTime() <= Date.now() : false;
+  const endedByStatus = listing.status && listing.status !== 'active';
+  if (endedByTime || endedByStatus) {
+    return NextResponse.json({ error: 'Auction ended. Bidding is closed.' }, { status: 400 });
+  }
+
   // Capture the current top bidder before the new bid lands so we can notify them.
   const { data: prevTopBid } = await supabaseAdmin
     .from('bids')

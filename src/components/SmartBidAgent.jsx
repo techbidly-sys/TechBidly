@@ -65,7 +65,7 @@ function winProbability(maxBid, currentBid, comparables, strategy = 'balanced') 
   return Math.min(95, Math.max(2, Math.round(adjusted)));
 }
 
-export default function SmartBidAgent({ listing, buyerId, onBidPlaced }) {
+export default function SmartBidAgent({ listing, buyerId, onBidPlaced, auctionEnded = false, auctionResult = null }) {
   const { role } = useAuth();
   const [cardChecked, setCardChecked] = useState(false);
   const [hasCard, setHasCard] = useState(false);
@@ -143,6 +143,22 @@ export default function SmartBidAgent({ listing, buyerId, onBidPlaced }) {
         >
           <CreditCard size={15} /> Add a payment card
         </Link>
+      </div>
+    );
+  }
+
+  if (auctionEnded) {
+    return (
+      <div className="rounded-xl bg-ink-50 border border-ink-200 p-4 space-y-2">
+        <div className="font-semibold text-ink-900">Auction ended</div>
+        <div className="text-sm text-ink-600">
+          Final bid: <span className="font-semibold text-ink-900">${Number(auctionResult?.finalBid ?? listing.currentBid).toLocaleString()}</span>
+        </div>
+        {auctionResult?.winnerDisplay && (
+          <div className="text-sm text-ink-600">
+            Winner: <span className="font-semibold text-ink-900">{auctionResult.winnerDisplay}</span>
+          </div>
+        )}
       </div>
     );
   }

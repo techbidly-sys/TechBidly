@@ -4,8 +4,10 @@
  */
 import { createSupabaseServerClient } from './supabase-server.js';
 import { mapListing } from './listing-utils.js';
+import { runAuctionLifecycleMaintenance } from './auction-lifecycle.js';
 
 export async function fetchListingsServer() {
+  await runAuctionLifecycleMaintenance();
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from('listings')

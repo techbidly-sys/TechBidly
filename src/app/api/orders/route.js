@@ -2,13 +2,12 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase-server.js';
 import { supabaseAdmin } from '@/lib/supabase-admin.js';
 import { getProfileRole } from '@/lib/role-guard.js';
+import { runAuctionLifecycleMaintenance } from '@/lib/auction-lifecycle.js';
 
 function deriveStatus(endsAt, orderStatus) {
   if (orderStatus) return orderStatus;
-  const days = (Date.now() - new Date(endsAt)) / (1000 * 60 * 60 * 24);
-  if (days < 2) return 'processing';
-  if (days < 6) return 'shipped';
-  return 'delivered';
+  if (!endsAt) return 'processing';
+  return 'processing';
 }
 
 function mapOrder(listing) {
@@ -27,6 +26,7 @@ function mapOrder(listing) {
 }
 
 export async function GET() {
+  await runAuctionLifecycleMaintenance();
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -83,11 +83,11 @@ export async function GET() {
     return NextResponse.json({ orders, role: 'seller' });
   }
 
-  // Buyer: find won auctions + marketplace orders in parallel
+  // Buyer: show all auction orders they participated in (open + closed)
   const [bidsResult, mktOrdersResult] = await Promise.all([
     supabaseAdmin
       .from('bids')
-      .select('listing_id, amount')
+      .select('listing_id, amount, created_at')
       .eq('buyer_id', user.id),
     supabaseAdmin
       .from('marketplace_orders')
@@ -117,7 +117,6 @@ export async function GET() {
     return NextResponse.json({ orders: [], marketplaceOrders, role: 'buyer' });
   }
 
-  // Build a map: listingId → user's max bid
   const bidMap = {};
   userBids.forEach((b) => {
     const lid = b.listing_id;
@@ -127,20 +126,62 @@ export async function GET() {
   });
 
   const listingIds = Object.keys(bidMap).map(Number);
-
-  const { data: soldListings, error } = await supabaseAdmin
+  const { data: listings, error } = await supabaseAdmin
     .from('listings')
     .select('*')
     .in('id', listingIds)
-    .eq('status', 'sold')
     .order('ends_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // User won if their max bid equals the listing's final current_bid
-  const wonListings = (soldListings ?? []).filter(
-    (l) => bidMap[l.id] === Number(l.current_bid)
+  const winnerRows = await Promise.all(
+    listingIds.map(async (listingId) => {
+      const { data: bid } = await supabaseAdmin
+        .from('bids')
+        .select('buyer_id, amount')
+        .eq('listing_id', listingId)
+        .order('amount', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return [listingId, bid ?? null];
+    })
   );
+  const winnersByListing = Object.fromEntries(winnerRows);
 
-  return NextResponse.json({ orders: wonListings.map(mapOrder), marketplaceOrders, role: 'buyer' });
+  const orders = (listings ?? []).map((listing) => {
+    const mapped = mapOrder(listing);
+    const userMaxBid = Number(bidMap[listing.id] ?? 0);
+    const topBid = winnersByListing[listing.id];
+    const topAmount = Number(topBid?.amount ?? listing.current_bid ?? 0);
+    const isWinner = topBid?.buyer_id === user.id;
+    const endedByTime = listing.ends_at ? new Date(listing.ends_at).getTime() <= Date.now() : false;
+    const isClosed = endedByTime || (listing.status && listing.status !== 'active');
+    const listingStatus = isClosed ? 'closed' : 'open';
+
+    let bidStatus = 'outbid';
+    if (isClosed) {
+      bidStatus = isWinner ? 'won' : 'outbid';
+      if (isWinner && mapped.status === 'shipped') {
+        bidStatus = 'shipped';
+      }
+      if (isWinner && mapped.status === 'delivered') {
+        bidStatus = 'shipped';
+      }
+    } else if (Math.abs(userMaxBid - topAmount) < 0.0001) {
+      bidStatus = 'highest_bidder';
+    }
+
+    return {
+      ...mapped,
+      yourBid: userMaxBid,
+      finalBid: topAmount,
+      listingStatus,
+      bidStatus,
+      wonAt: isClosed ? listing.ends_at : null,
+      isWinner,
+    };
+  });
+
+  return NextResponse.json({ orders, marketplaceOrders, role: 'buyer' });
 }

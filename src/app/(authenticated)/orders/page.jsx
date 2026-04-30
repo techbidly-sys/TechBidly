@@ -26,6 +26,13 @@ const STATUS_CONFIG = {
   },
 };
 
+const BID_STATUS_CONFIG = {
+  highest_bidder: { label: 'Highest bidder', chip: 'bg-emerald-50 text-emerald-700' },
+  outbid: { label: 'Outbid', chip: 'bg-red-50 text-red-700' },
+  won: { label: 'Won', chip: 'bg-emerald-50 text-emerald-700' },
+  shipped: { label: 'Shipped', chip: 'bg-emerald-50 text-emerald-700' },
+};
+
 function fmt(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -34,14 +41,13 @@ function fmt(dateStr) {
 // ── Buyer view ────────────────────────────────────────────────────────────────
 
 const AUCTION_TABS = [
-  { id: 'active', label: 'Active', filter: (o) => o.status !== 'delivered' },
-  { id: 'past', label: 'Past', filter: (o) => o.status === 'delivered' },
+  { id: 'open', label: 'Open', filter: (o) => o.listingStatus === 'open' },
+  { id: 'closed', label: 'Closed', filter: (o) => o.listingStatus === 'closed' },
   { id: 'all', label: 'All', filter: () => true },
 ];
 
 function BuyerOrders({ orders, marketplaceOrders }) {
-  const [section, setSection] = useState('auctions');
-  const [tab, setTab] = useState('active');
+  const [tab, setTab] = useState('open');
   const current = AUCTION_TABS.find((t) => t.id === tab);
   const list = orders.filter(current.filter);
 
@@ -49,74 +55,56 @@ function BuyerOrders({ orders, marketplaceOrders }) {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-bold">Your orders</h1>
-        <p className="text-sm text-ink-500 mt-1">Track shipments, auction wins, and marketplace purchases.</p>
+        <p className="text-sm text-ink-500 mt-1">Every auction you bid on, with live position and close outcome.</p>
       </div>
 
-      {/* Section switcher */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setSection('auctions')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition ${
-            section === 'auctions'
-              ? 'bg-ink-900 text-white border-ink-900'
-              : 'border-ink-200 text-ink-600 hover:bg-ink-50'
-          }`}
-        >
-          <Package size={15} /> Auctions
-          <span className="text-[11px] opacity-70">{orders.length}</span>
-        </button>
-        <button
-          onClick={() => setSection('marketplace')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition ${
-            section === 'marketplace'
-              ? 'bg-ink-900 text-white border-ink-900'
-              : 'border-ink-200 text-ink-600 hover:bg-ink-50'
-          }`}
-        >
-          <Building2 size={15} /> Marketplace
-          <span className="text-[11px] opacity-70">{marketplaceOrders.length}</span>
-        </button>
+      <div className="flex items-center gap-2 text-sm">
+        <span className="chip bg-ink-900 text-white">
+          <Package size={12} /> Orders
+        </span>
+        <span className="text-ink-500">{orders.length} auction{orders.length === 1 ? '' : 's'}</span>
       </div>
 
-      {section === 'auctions' ? (
-        <>
-          <div className="flex items-center gap-2 border-b border-ink-100">
-            {AUCTION_TABS.map((t) => {
-              const count = orders.filter(t.filter).length;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition ${
-                    tab === t.id
-                      ? 'border-ink-900 text-ink-900'
-                      : 'border-transparent text-ink-500 hover:text-ink-800'
-                  }`}
-                >
-                  {t.label}
-                  <span className="ml-2 text-[11px] text-ink-400">{count}</span>
-                </button>
-              );
-            })}
+      <div className="flex items-center gap-2 border-b border-ink-100">
+        {AUCTION_TABS.map((t) => {
+          const count = orders.filter(t.filter).length;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition ${
+                tab === t.id
+                  ? 'border-ink-900 text-ink-900'
+                  : 'border-transparent text-ink-500 hover:text-ink-800'
+              }`}
+            >
+              {t.label}
+              <span className="ml-2 text-[11px] text-ink-400">{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {list.length === 0 ? (
+        <div className="card p-12 text-center">
+          <Package size={28} className="mx-auto text-ink-300 mb-3" />
+          <div className="font-semibold text-ink-900">No auctions in this view</div>
+          <div className="text-sm text-ink-500 mt-1">
+            {tab === 'open' ? 'Place bids on active auctions to see them here.' : 'No closed auctions in this view yet.'}
           </div>
-
-          {list.length === 0 ? (
-            <div className="card p-12 text-center">
-              <Package size={28} className="mx-auto text-ink-300 mb-3" />
-              <div className="font-semibold text-ink-900">No orders here</div>
-              <div className="text-sm text-ink-500 mt-1">
-                {tab === 'active' ? 'Win an auction and your order will appear here.' : 'No completed orders yet.'}
-              </div>
-              <Link href="/browse" className="btn-brand mt-4 inline-flex">Browse auctions</Link>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {list.map((o) => <BuyerOrderRow key={o.id} order={o} />)}
-            </div>
-          )}
-        </>
+          <Link href="/browse" className="btn-brand mt-4 inline-flex">Browse auctions</Link>
+        </div>
       ) : (
-        <MarketplaceOrders orders={marketplaceOrders} />
+        <div className="space-y-3">
+          {list.map((o) => <BuyerOrderRow key={o.id} order={o} />)}
+        </div>
+      )}
+
+      {marketplaceOrders.length > 0 && (
+        <div className="pt-2">
+          <div className="text-sm font-semibold text-ink-700 mb-2">Marketplace purchases</div>
+          <MarketplaceOrders orders={marketplaceOrders} />
+        </div>
       )}
     </div>
   );
@@ -196,7 +184,7 @@ function MarketplaceOrderRow({ order }) {
 }
 
 function BuyerOrderRow({ order }) {
-  const cfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.processing;
+  const bidCfg = BID_STATUS_CONFIG[order.bidStatus] ?? BID_STATUS_CONFIG.outbid;
 
   return (
     <Link
@@ -215,10 +203,13 @@ function BuyerOrderRow({ order }) {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`chip ${cfg.chip}`}>
-            <cfg.Icon size={11} /> {cfg.label}
+          <span className={`chip ${order.listingStatus === 'open' ? 'bg-amber-50 text-amber-700' : 'bg-ink-100 text-ink-700'}`}>
+            {order.listingStatus === 'open' ? 'Open' : 'Closed'}
           </span>
-          <span className="text-xs text-ink-400">Order {order.id}</span>
+          <span className={`chip ${bidCfg.chip}`}>
+            {bidCfg.label}
+          </span>
+          <span className="text-xs text-ink-400">Auction {order.id}</span>
         </div>
         <div className="font-semibold text-ink-900 mt-1 truncate">{order.title}</div>
         <div className="text-xs text-ink-500 mt-0.5 flex items-center gap-3 flex-wrap">
@@ -227,8 +218,10 @@ function BuyerOrderRow({ order }) {
               <MapPin size={11} /> {order.location}
             </span>
           )}
-          <span>Won {fmt(order.endsAt)}</span>
-          {order.trackingNumber && (
+          <span>{order.listingStatus === 'open' ? 'Ends' : 'Closed'} {fmt(order.endsAt)}</span>
+          <span>Your max: ${Number(order.yourBid ?? 0).toLocaleString()}</span>
+          <span>{order.listingStatus === 'open' ? 'Current' : 'Final'}: ${Number(order.finalBid ?? order.finalPrice ?? 0).toLocaleString()}</span>
+          {order.trackingNumber && order.bidStatus === 'shipped' && (
             <span className="font-mono text-ink-600">{order.trackingNumber}</span>
           )}
         </div>
@@ -236,9 +229,9 @@ function BuyerOrderRow({ order }) {
 
       <div className="text-right shrink-0">
         <div className="font-display text-xl font-bold text-ink-900">
-          ${order.finalPrice.toLocaleString()}
+          ${Number(order.finalBid ?? order.finalPrice).toLocaleString()}
         </div>
-        <div className="text-[11px] text-ink-500">final price</div>
+        <div className="text-[11px] text-ink-500">{order.listingStatus === 'open' ? 'current top bid' : 'closing bid'}</div>
       </div>
 
       <ChevronRight size={16} className="text-ink-300 shrink-0" />

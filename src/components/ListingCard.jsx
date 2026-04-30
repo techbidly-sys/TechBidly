@@ -1,11 +1,32 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { MapPin, Heart, Gavel } from 'lucide-react';
 import CountdownTimer from './CountdownTimer.jsx';
 import AuthBadge from './AuthBadge.jsx';
+import {
+  isListingWatchlisted,
+  subscribeToWatchlistChanges,
+  toggleListingWatchlist,
+} from '@/lib/watchlist.js';
 
 export default function ListingCard({ listing, variant = 'default' }) {
+  const [isWatchlisted, setIsWatchlisted] = useState(false);
+
+  useEffect(() => {
+    setIsWatchlisted(isListingWatchlisted(listing.id));
+    return subscribeToWatchlistChanges((ids) => {
+      setIsWatchlisted(ids.includes(Number(listing.id)));
+    });
+  }, [listing.id]);
+
+  const handleToggleWatchlist = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsWatchlisted(toggleListingWatchlist(listing.id));
+  };
+
   if (variant === 'wide') {
     return (
       <Link
@@ -58,11 +79,13 @@ export default function ListingCard({ listing, variant = 'default' }) {
           <CountdownTimer endsAt={listing.endsAt} compact />
         </div>
         <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          className="absolute top-3 right-3 h-8 w-8 grid place-items-center rounded-full bg-white/90 backdrop-blur text-ink-700 hover:text-rose-500 transition"
-          aria-label="Add to watchlist"
+          onClick={handleToggleWatchlist}
+          className={`absolute top-3 right-3 h-8 w-8 grid place-items-center rounded-full bg-white/90 backdrop-blur transition ${
+            isWatchlisted ? 'text-rose-500' : 'text-ink-700 hover:text-rose-500'
+          }`}
+          aria-label={isWatchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
         >
-          <Heart size={15} />
+          <Heart size={15} className={isWatchlisted ? 'fill-current' : ''} />
         </button>
         {listing.auth && (
           <div className="absolute bottom-3 left-3">

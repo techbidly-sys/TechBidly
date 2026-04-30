@@ -3,8 +3,10 @@ import { createSupabaseServerClient } from '@/lib/supabase-server.js';
 import { supabaseAdmin } from '@/lib/supabase-admin.js';
 import { getProfileRole } from '@/lib/role-guard.js';
 import { stripe } from '@/lib/stripe-server.js';
+import { runAuctionLifecycleMaintenance } from '@/lib/auction-lifecycle.js';
 
 export async function GET() {
+  await runAuctionLifecycleMaintenance();
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
