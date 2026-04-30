@@ -10,6 +10,32 @@ export async function insertBid(listingId, buyerId, amount) {
   return data;
 }
 
+export async function fetchBidHistory(listingId) {
+  const { data, error } = await supabase
+    .from('bids')
+    .select('amount, created_at')
+    .eq('listing_id', Number(listingId))
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((b) => ({
+    amount: Number(b.amount),
+    createdAt: b.created_at,
+  }));
+}
+
+export async function fetchUserBidForListing(listingId, buyerId) {
+  if (!buyerId) return null;
+  const { data } = await supabase
+    .from('bids')
+    .select('amount')
+    .eq('listing_id', Number(listingId))
+    .eq('buyer_id', buyerId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data ? Number(data.amount) : null;
+}
+
 export async function fetchRecentBids(listingId) {
   const { data, error } = await supabase
     .from('bids')

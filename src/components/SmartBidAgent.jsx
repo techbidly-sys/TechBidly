@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { fetchUserBidForListing } from '@/lib/bids.js';
 import {
   Bot,
   Sparkles,
@@ -16,7 +17,11 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  Store,
+  CreditCard,
 } from 'lucide-react';
+import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext.jsx';
 
 const STRATEGIES = [
   {
@@ -24,45 +29,67 @@ const STRATEGIES = [
     label: 'Sniper',
     icon: Zap,
     desc: 'Bids in the final 90 seconds. Historically wins 18% cheaper.',
-    color: 'brand',
+    selectedBorder: 'border-brand-500',
+    selectedBg: 'bg-brand-50',
+    selectedIcon: 'text-brand-600',
   },
   {
     id: 'balanced',
     label: 'Balanced',
     icon: Activity,
     desc: 'Bids at T-1h then again at T-5min if outbid.',
-    color: 'accent',
+    selectedBorder: 'border-orange-400',
+    selectedBg: 'bg-orange-50',
+    selectedIcon: 'text-orange-500',
   },
   {
     id: 'conservative',
     label: 'Conservative',
     icon: ShieldCheck,
     desc: 'Bids now and defends lead in real time.',
-    color: 'emerald',
+    selectedBorder: 'border-emerald-500',
+    selectedBg: 'bg-emerald-50',
+    selectedIcon: 'text-emerald-600',
   },
 ];
 
-function winProbability(maxBid, currentBid, comparables) {
+// Sniper wins cheaper but is riskier; conservative defends position more reliably.
+const STRATEGY_MULTIPLIER = { sniper: 0.82, balanced: 1.0, conservative: 1.18 };
+
+function winProbability(maxBid, currentBid, comparables, strategy = 'balanced') {
   if (maxBid <= currentBid) return 0;
   const median = comparables[Math.floor(comparables.length / 2)];
-  const raw = ((maxBid - currentBid) / (median - currentBid)) * 75;
-  return Math.min(95, Math.max(2, Math.round(raw)));
+  if (!median || median <= currentBid) return 0;
+  const base = ((maxBid - currentBid) / (median - currentBid)) * 75;
+  const adjusted = base * (STRATEGY_MULTIPLIER[strategy] ?? 1.0);
+  return Math.min(95, Math.max(2, Math.round(adjusted)));
 }
 
-export default function SmartBidAgent({ listing, onBidPlaced }) {
-  const minNext = listing.currentBid + 5;
+export default function SmartBidAgent({ listing, buyerId, onBidPlaced }) {
+  const { role } = useAuth();
+  const [cardChecked, setCardChecked] = useState(false);
+  const [hasCard, setHasCard] = useState(false);
   const [maxBid, setMaxBid] = useState(Math.round(listing.currentBid * 1.07));
   const [strategy, setStrategy] = useState('sniper');
   const [mode, setMode] = useState('manual'); // manual | setup | armed
   const [showComps, setShowComps] = useState(false);
   const [agentStatus, setAgentStatus] = useState('leading');
-  const [manualBid, setManualBid] = useState(minNext);
-  const [placed, setPlaced] = useState(false);
+  const [manualBid, setManualBid] = useState(listing.currentBid + 5);
+  const [placedAmount, setPlacedAmount] = useState(null); // null = not placed
   const [submitting, setSubmitting] = useState(false);
   const [bidError, setBidError] = useState('');
 
-  const prob = winProbability(maxBid, listing.currentBid, listing.comparables ?? []);
-  const aiSuggestion = Math.round(listing.comparables?.[1] ?? listing.currentBid * 1.06);
+  useEffect(() => {
+    if (role !== 'buyer') return;
+    Promise.all([
+      fetch('/api/stripe/payment-methods').then((r) => r.json()).catch(() => ({ methods: [] })),
+      fetchUserBidForListing(listing.id, buyerId),
+    ]).then(([data, existingBid]) => {
+      setHasCard((data.methods ?? []).length > 0);
+      if (existingBid !== null) setPlacedAmount(existingBid);
+      setCardChecked(true);
+    }).catch(() => setCardChecked(true));
+  }, [role, listing.id, buyerId]);
 
   // Simulate agent status ticking while armed
   useEffect(() => {
@@ -75,6 +102,55 @@ export default function SmartBidAgent({ listing, onBidPlaced }) {
     }, 4000);
     return () => clearInterval(id);
   }, [mode]);
+
+  if (role === 'seller') {
+    return (
+      <div className="rounded-xl border border-ink-200 bg-ink-50 px-4 py-4 flex items-start gap-3">
+        <Store size={18} className="text-ink-400 shrink-0 mt-0.5" />
+        <div>
+          <div className="text-sm font-semibold text-ink-700">Seller account</div>
+          <div className="text-xs text-ink-500 mt-0.5">Switch to your buyer account to place bids.</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!cardChecked) {
+    return (
+      <div className="rounded-xl border border-ink-100 p-4 flex items-center gap-2 text-sm text-ink-500">
+        <div className="h-4 w-4 rounded-full border-2 border-brand-400 border-t-transparent animate-spin flex-shrink-0" />
+        Checking payment method…
+      </div>
+    );
+  }
+
+  if (!hasCard) {
+    return (
+      <div className="rounded-xl border-2 border-dashed border-ink-200 p-5 text-center space-y-3">
+        <div className="h-11 w-11 rounded-full bg-ink-100 grid place-items-center mx-auto">
+          <CreditCard size={20} className="text-ink-500" />
+        </div>
+        <div>
+          <div className="font-semibold text-ink-900">Payment card required</div>
+          <div className="text-xs text-ink-500 mt-1 leading-relaxed">
+            You need a valid payment card on file before placing bids.
+            TechBidly uses it to settle winning bids automatically.
+          </div>
+        </div>
+        <Link
+          href="/profile?tab=billing"
+          className="btn-brand inline-flex mx-auto"
+        >
+          <CreditCard size={15} /> Add a payment card
+        </Link>
+      </div>
+    );
+  }
+
+  const minNext = listing.currentBid + 5;
+
+  const prob = winProbability(maxBid, listing.currentBid, listing.comparables ?? [], strategy);
+  const aiSuggestion = Math.round(listing.comparables?.[1] ?? listing.currentBid * 1.06);
 
   const armAgent = () => {
     if (maxBid < minNext) return;
@@ -95,7 +171,7 @@ export default function SmartBidAgent({ listing, onBidPlaced }) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Failed to place bid. Please try again.');
-      setPlaced(true);
+      setPlacedAmount(manualBid);
       onBidPlaced?.();
     } catch (err) {
       setBidError(err.message ?? 'Failed to place bid. Please try again.');
@@ -104,11 +180,14 @@ export default function SmartBidAgent({ listing, onBidPlaced }) {
     }
   };
 
-  if (placed) {
+  if (placedAmount !== null) {
     return (
-      <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
-        <div className="font-semibold text-emerald-800">Your bid is in.</div>
-        <div className="text-sm text-emerald-700 mt-0.5">
+      <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 space-y-1">
+        <div className="flex items-center justify-between">
+          <div className="font-semibold text-emerald-800">Your bid is in.</div>
+          <div className="text-sm font-bold text-emerald-700">${placedAmount.toLocaleString()}</div>
+        </div>
+        <div className="text-sm text-emerald-700">
           We'll notify you the moment you're outbid or the auction ends.
         </div>
       </div>
@@ -187,22 +266,25 @@ export default function SmartBidAgent({ listing, onBidPlaced }) {
             <div>
               <span className="label">Strategy</span>
               <div className="grid grid-cols-3 gap-2">
-                {STRATEGIES.map(({ id, label, icon: Icon, desc, color }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setStrategy(id)}
-                    className={`rounded-xl border p-3 text-left transition ${
-                      strategy === id
-                        ? `border-${color === 'brand' ? 'brand' : color === 'accent' ? 'accent' : 'emerald'}-500 bg-${color === 'brand' ? 'brand' : color === 'accent' ? 'accent' : 'emerald'}-50`
-                        : 'border-ink-200 hover:border-ink-300'
-                    }`}
-                  >
-                    <Icon size={16} className={`mb-1.5 ${strategy === id ? `text-${color === 'brand' ? 'brand' : color === 'accent' ? 'accent' : 'emerald'}-600` : 'text-ink-500'}`} />
-                    <div className={`text-xs font-semibold ${strategy === id ? 'text-ink-900' : 'text-ink-700'}`}>{label}</div>
-                    <div className="text-[10px] text-ink-500 mt-0.5 leading-tight">{desc}</div>
-                  </button>
-                ))}
+                {STRATEGIES.map(({ id, label, icon: Icon, desc, selectedBorder, selectedBg, selectedIcon }) => {
+                  const isSelected = strategy === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setStrategy(id)}
+                      className={`rounded-xl border p-3 text-left transition ${
+                        isSelected
+                          ? `${selectedBorder} ${selectedBg}`
+                          : 'border-ink-200 hover:border-ink-300 bg-white'
+                      }`}
+                    >
+                      <Icon size={16} className={`mb-1.5 ${isSelected ? selectedIcon : 'text-ink-500'}`} />
+                      <div className={`text-xs font-semibold ${isSelected ? 'text-ink-900' : 'text-ink-700'}`}>{label}</div>
+                      <div className="text-[10px] text-ink-500 mt-0.5 leading-tight">{desc}</div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -242,7 +324,7 @@ export default function SmartBidAgent({ listing, onBidPlaced }) {
               disabled={maxBid < minNext}
               className="btn-brand w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Bot size={16} /> Arm agent · max ${maxBid.toLocaleString()}
+              <Bot size={16} /> Bid with agent · ${maxBid.toLocaleString()}
             </button>
           </div>
         )}
