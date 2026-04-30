@@ -1,13 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { Gavel, Heart, Trophy, ArrowRight, Sparkles, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext.jsx';
-import { user as mockUser } from '@/data/mockData.js';
 
 export default function HomeHero({ endingSoonCount }) {
   const { profile } = useAuth();
-  const handle = profile?.handle ?? mockUser.handle;
+  const handle = profile?.handle ?? 'there';
   const handleParts = handle.split('#');
 
   return (
@@ -26,8 +25,8 @@ export default function HomeHero({ endingSoonCount }) {
             {handleParts[1] && <span className="text-brand-300">#{handleParts[1]}</span>}
           </h1>
           <p className="mt-2 text-ink-200 max-w-md">
-            You have <span className="text-white font-semibold">{mockUser.activeBids} active bids</span> and{' '}
-            <span className="text-white font-semibold">{endingSoonCount} auctions ending soon</span> in your watchlist.
+            There {endingSoonCount === 1 ? 'is' : 'are'}{' '}
+            <span className="text-white font-semibold">{endingSoonCount} auction{endingSoonCount !== 1 ? 's' : ''} ending soon</span> — don't miss out.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             <Link href="/browse" className="btn-brand">
@@ -39,31 +38,8 @@ export default function HomeHero({ endingSoonCount }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Stat icon={Gavel} label="Active bids" value={mockUser.activeBids} tone="brand" />
-          <Stat icon={Trophy} label="Bids won" value={mockUser.bidsWon} tone="amber" />
-          <Stat icon={Heart} label="Watchlist" value={mockUser.watchlist} tone="rose" />
-          <Stat icon={ShieldCheck} label="Trust score" value={`${mockUser.rating}★`} tone="emerald" />
-        </div>
       </div>
     </section>
   );
 }
 
-function Stat({ icon: Icon, label, value, tone = 'brand' }) {
-  const tones = {
-    brand: 'bg-brand-500/15 text-brand-200',
-    amber: 'bg-amber-400/15 text-amber-200',
-    rose: 'bg-rose-400/15 text-rose-200',
-    emerald: 'bg-emerald-400/15 text-emerald-200',
-  };
-  return (
-    <div className="rounded-2xl p-4 bg-white/5 border border-white/10 backdrop-blur">
-      <div className={`h-9 w-9 rounded-lg grid place-items-center ${tones[tone]}`}>
-        <Icon size={16} />
-      </div>
-      <div className="mt-3 text-2xl font-display font-bold text-white">{value}</div>
-      <div className="text-xs text-ink-300">{label}</div>
-    </div>
-  );
-}

@@ -22,6 +22,7 @@ export function mapListing(row) {
     seller: row.seller_handle ?? 'Anonymous Seller',
     rating: Number(row.rating) || 5.0,
     description: row.description ?? '',
+    quantity: row.quantity ?? 1,
     tags: row.tags ?? [],
     auth: row.auth ?? { status: 'unverified', fraudScore: 0, checks: [] },
     comparables: row.comparables ?? [],

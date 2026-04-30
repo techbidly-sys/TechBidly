@@ -28,37 +28,19 @@ export async function fetchListingById(id) {
   return mapListing(data);
 }
 
-export async function createListing({ sellerId, sellerHandle, form }) {
-  const endsAt = new Date(Date.now() + Number(form.duration) * 24 * 3600 * 1000).toISOString();
-  const parts = (form.location ?? '').split(',');
-  const city = parts[0]?.trim() ?? '';
-  const country = parts.slice(1).join(',').trim();
+export async function createListing({ sellerHandle, form }) {
+  // Call the API endpoint which handles listing creation and notifications server-side.
+  const res = await fetch('/api/listings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sellerHandle, form }),
+  });
 
-  const { data, error } = await supabase
-    .from('listings')
-    .insert({
-      seller_id: sellerId,
-      seller_handle: sellerHandle,
-      title: form.title,
-      category: form.category,
-      condition: form.condition,
-      description: form.description,
-      image_url: form.imageUrl || null,
-      starting_bid: Number(form.startingBid),
-      current_bid: Number(form.startingBid),
-      ends_at: endsAt,
-      city,
-      country,
-      bid_count: 0,
-      featured: false,
-      status: 'active',
-      tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-      auth: { status: 'unverified', fraudScore: 0, checks: [] },
-      comparables: [],
-    })
-    .select()
-    .single();
+  if (!res.ok) {
+    const json = await res.json();
+    throw new Error(json.error ?? 'Failed to create listing');
+  }
 
-  if (error) throw error;
-  return mapListing(data);
+  const json = await res.json();
+  return mapListing(json.listing);
 }

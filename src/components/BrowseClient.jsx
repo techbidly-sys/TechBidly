@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Filter, SlidersHorizontal, ArrowDownUp, Search } from 'lucide-react';
+import { Filter, SlidersHorizontal, Search } from 'lucide-react';
 import { categories, conditions } from '@/data/mockData.js';
 import ListingCard from '@/components/ListingCard.jsx';
 
@@ -41,44 +41,12 @@ export default function BrowseClient({ initialListings }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold">Browse auctions</h1>
-          <p className="text-sm text-ink-500 mt-1">
-            {filtered.length} active listing{filtered.length === 1 ? '' : 's'}
-            {q ? ` matching "${q}"` : ''} · all sellers verified anonymous.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <ArrowDownUp size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              className="input pl-9 pr-9 appearance-none cursor-pointer w-44"
-            >
-              {SORTS.map((s) => (
-                <option key={s.id} value={s.id}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {categories.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setCategory(c.id)}
-            className={`chip whitespace-nowrap ${
-              category === c.id
-                ? 'bg-ink-900 text-white'
-                : 'bg-white border border-ink-200 text-ink-700 hover:bg-ink-50'
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
+      <div>
+        <h1 className="font-display text-3xl font-bold">Browse auctions</h1>
+        <p className="text-sm text-ink-500 mt-1">
+          {filtered.length} active listing{filtered.length === 1 ? '' : 's'}
+          {q ? ` matching "${q}"` : ''} · all sellers verified anonymous.
+        </p>
       </div>
 
       <div className="grid lg:grid-cols-[260px,1fr] gap-6">
@@ -96,6 +64,44 @@ export default function BrowseClient({ initialListings }) {
               </div>
             </div>
           )}
+
+          <div>
+            <span className="label">Category</span>
+            <div className="grid grid-cols-2 gap-2">
+              {categories.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setCategory(c.id)}
+                  className={`text-xs rounded-lg border py-2 capitalize transition ${
+                    category === c.id
+                      ? 'border-brand-500 bg-brand-50 text-brand-700 font-semibold'
+                      : 'border-ink-200 text-ink-600 hover:bg-ink-50'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <span className="label">Sort by</span>
+            <div className="grid grid-cols-2 gap-2">
+              {SORTS.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setSort(s.id)}
+                  className={`text-xs rounded-lg border py-2 transition ${
+                    sort === s.id
+                      ? 'border-brand-500 bg-brand-50 text-brand-700 font-semibold'
+                      : 'border-ink-200 text-ink-600 hover:bg-ink-50'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div>
             <span className="label">Condition</span>
@@ -132,7 +138,7 @@ export default function BrowseClient({ initialListings }) {
           </div>
 
           <button
-            onClick={() => { setCategory('all'); setCondition('any'); setMaxPrice(2500); clearSearch(); }}
+            onClick={() => { setCategory('all'); setCondition('any'); setSort('ending'); setMaxPrice(2500); clearSearch(); }}
             className="btn-outline w-full"
           >
             <Filter size={14} /> Reset filters

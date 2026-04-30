@@ -1,21 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sparkles, Tag, Wand2, CheckCircle2, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+import { Sparkles, Tag, Wand2, CheckCircle2, AlertCircle, CreditCard } from 'lucide-react';
 import { categories, conditions } from '@/data/mockData.js';
 import AIPhotoGrader from '@/components/AIPhotoGrader.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { createListing } from '@/lib/listings.js';
 
 export default function Sell() {
-  const { session, profile } = useAuth();
+  const { session, profile, role } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (profile && role !== 'seller') router.replace('/browse');
+  }, [profile, role, router]);
 
   const [form, setForm] = useState({
     title: '',
     category: 'phones',
     condition: 'Like New',
+    quantity: 1,
     startingBid: 200,
     duration: '3',
     description: '',
@@ -26,6 +32,18 @@ export default function Sell() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(null);
   const [error, setError] = useState('');
+  const [cardChecked, setCardChecked] = useState(false);
+  const [hasCard, setHasCard] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/stripe/payment-methods')
+      .then((r) => r.json())
+      .then((data) => {
+        setHasCard((data.methods ?? []).length > 0);
+        setCardChecked(true);
+      })
+      .catch(() => setCardChecked(true));
+  }, []);
 
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -44,7 +62,6 @@ export default function Sell() {
     setSubmitting(true);
     try {
       const listing = await createListing({
-        sellerId: session.user.id,
         sellerHandle: profile?.handle ?? 'Anonymous Seller',
         form,
       });
@@ -76,13 +93,45 @@ export default function Sell() {
           <button
             onClick={() => {
               setSubmitted(null);
-              setForm({ title: '', category: 'phones', condition: 'Like New', startingBid: 200, duration: '3', description: '', location: '', imageUrl: '', tags: '' });
+              setForm({ title: '', category: 'phones', condition: 'Like New', quantity: 1, startingBid: 200, duration: '3', description: '', location: '', imageUrl: '', tags: '' });
             }}
             className="btn-outline"
           >
             List another
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (!cardChecked) {
+    return (
+      <div className="max-w-xl mx-auto card p-10 text-center">
+        <div className="h-8 w-8 rounded-full border-2 border-brand-400 border-t-transparent animate-spin mx-auto" />
+        <p className="text-sm text-ink-500 mt-4">Loading your account…</p>
+      </div>
+    );
+  }
+
+  if (!hasCard) {
+    return (
+      <div className="max-w-xl mx-auto card p-10 text-center space-y-4">
+        <div className="h-14 w-14 rounded-full bg-ink-100 grid place-items-center mx-auto">
+          <CreditCard size={26} className="text-ink-500" />
+        </div>
+        <div>
+          <h1 className="font-display text-2xl font-bold">Payment card required</h1>
+          <p className="text-sm text-ink-500 mt-2 leading-relaxed">
+            You need a valid payment card on file before creating listings.
+            TechBidly uses it to cover any platform fees and verify your account is active.
+          </p>
+        </div>
+        <Link href="/profile?tab=billing" className="btn-brand inline-flex mx-auto">
+          <CreditCard size={15} /> Add a payment card
+        </Link>
+        <p className="text-xs text-ink-400">
+          Once added, come back here to create your listing.
+        </p>
       </div>
     );
   }
@@ -128,6 +177,10 @@ export default function Sell() {
               <select value={form.condition} onChange={update('condition')} className="input cursor-pointer">
                 {conditions.map((c) => <option key={c}>{c}</option>)}
               </select>
+            </div>
+            <div>
+              <span className="label">Quantity</span>
+              <input type="number" value={form.quantity} onChange={update('quantity')} min={1} className="input" required />
             </div>
             <div>
               <span className="label">Seller location</span>

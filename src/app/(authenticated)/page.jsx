@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { TrendingUp, ArrowRight, Sparkles, Flame } from 'lucide-react';
-import { user } from '@/data/mockData.js';
 import { fetchListingsServer } from '@/lib/listings-server.js';
 import ListingCard from '@/components/ListingCard.jsx';
 import HomeHero from '@/components/HomeHero.jsx';
@@ -10,7 +9,7 @@ export default async function Home() {
   const listings = await fetchListingsServer().catch(() => []);
 
   const featured = listings.filter((l) => l.featured);
-  const forYou = listings.filter((l) => user.preferences.includes(l.category)).slice(0, 4);
+  const forYou = listings.slice(0, 4);
   const endingSoon = [...listings]
     .sort((a, b) => new Date(a.endsAt) - new Date(b.endsAt))
     .slice(0, 3);
@@ -39,7 +38,6 @@ export default async function Home() {
           <SectionHeader
             eyebrow={<><Sparkles size={12} /> Personalised</>}
             title="Picked for you"
-            subtitle={`Matched to your interests: ${user.preferences.join(', ')}.`}
             link="/browse"
           />
           <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">

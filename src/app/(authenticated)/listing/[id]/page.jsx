@@ -18,6 +18,7 @@ import {
 import CountdownTimer from '@/components/CountdownTimer.jsx';
 import AuthBadge from '@/components/AuthBadge.jsx';
 import SmartBidAgent from '@/components/SmartBidAgent.jsx';
+import BidHistoryChart from '@/components/BidHistoryChart.jsx';
 import { fetchListingById } from '@/lib/listings.js';
 import { fetchRecentBids } from '@/lib/bids.js';
 import { supabase } from '@/lib/supabase.js';
@@ -151,6 +152,12 @@ export default function ListingDetail() {
             )}
           </div>
 
+          <BidHistoryChart
+            listingId={id}
+            startingBid={listing.startingBid}
+            bidCount={listing.bids}
+          />
+
           <div className="card p-6">
             <div className="flex items-center gap-2 font-semibold">
               <Info size={16} /> About the seller
@@ -172,7 +179,7 @@ export default function ListingDetail() {
                   ${listing.currentBid.toLocaleString()}
                 </div>
                 <div className="text-xs text-ink-500 mt-1">
-                  {listing.bids} bids · started at ${listing.startingBid.toLocaleString()}
+                  {listing.bids} bids · started at ${listing.startingBid.toLocaleString()} · qty {listing.quantity ?? 1}
                 </div>
               </div>
               <CountdownTimer endsAt={listing.endsAt} />
