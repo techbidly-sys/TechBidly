@@ -4,22 +4,47 @@ import { supabaseAdmin } from '@/lib/supabase-admin.js';
 import { getProfileRole } from '@/lib/role-guard.js';
 import { stripe } from '@/lib/stripe-server.js';
 import { runAuctionLifecycleMaintenance } from '@/lib/auction-lifecycle.js';
+import { emailNotify } from '@/lib/email.js';
 
-export async function GET() {
+export async function GET(request) {
   await runAuctionLifecycleMaintenance();
   const supabase = await createSupabaseServerClient();
 
-  const { data, error } = await supabase
+  const { searchParams } = new URL(request.url);
+  const q = searchParams.get('q')?.trim() ?? '';
+  const category = searchParams.get('category')?.trim() ?? '';
+  const condition = searchParams.get('condition')?.trim() ?? '';
+  const maxPrice = Number(searchParams.get('maxPrice')) || 0;
+  const limit = Math.min(Number(searchParams.get('limit')) || 50, 100);
+  const offset = Math.max(Number(searchParams.get('offset')) || 0, 0);
+
+  let query = supabase
     .from('listings')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('status', 'active')
-    .order('ends_at', { ascending: true });
+    .order('ends_at', { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  if (q) {
+    query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%`);
+  }
+  if (category) {
+    query = query.eq('category', category);
+  }
+  if (condition) {
+    query = query.eq('condition', condition);
+  }
+  if (maxPrice > 0) {
+    query = query.lte('current_bid', maxPrice);
+  }
+
+  const { data, error, count } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ listings: data ?? [] });
+  return NextResponse.json({ listings: data ?? [], total: count ?? 0, offset, limit });
 }
 
 export async function POST(request) {
@@ -103,6 +128,9 @@ export async function POST(request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  if (!data?.id) {
+    return NextResponse.json({ error: 'Listing created without an identifier' }, { status: 500 });
+  }
 
   // Insert a notification for the seller that their listing is live
   const { error: notifError } = await supabaseAdmin.from('notifications').insert({
@@ -116,6 +144,8 @@ export async function POST(request) {
   if (notifError) {
     console.error('Listing posted notification error:', notifError);
   }
+
+  emailNotify.listingPosted(user.id, data.title).catch(() => {});
 
   return NextResponse.json({ listing: data });
 }

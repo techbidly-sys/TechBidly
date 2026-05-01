@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Filter, SlidersHorizontal, Search } from 'lucide-react';
 import { categories, conditions } from '@/data/mockData.js';
 import ListingCard from '@/components/ListingCard.jsx';
+import { mapListing } from '@/lib/listing-utils.js';
 
 const SORTS = [
   { id: 'ending', label: 'Ending soon' },
@@ -20,16 +21,37 @@ export default function BrowseClient({ initialListings }) {
   const [condition, setCondition] = useState('any');
   const [sort, setSort] = useState('ending');
   const [maxPrice, setMaxPrice] = useState(2500);
+  const [listings, setListings] = useState(initialListings);
+  const [loading, setLoading] = useState(false);
   const q = searchParams.get('q') ?? '';
+  const fetchController = useRef(null);
 
-  const clearSearch = () => router.replace('/browse');
+  useEffect(() => {
+    // Cancel any in-flight request
+    if (fetchController.current) fetchController.current.abort();
+    const controller = new AbortController();
+    fetchController.current = controller;
 
-  const filtered = useMemo(() => {
-    let list = [...initialListings];
-    if (category !== 'all') list = list.filter((l) => l.category === category);
-    if (condition !== 'any') list = list.filter((l) => l.condition === condition);
-    if (q) list = list.filter((l) => l.title.toLowerCase().includes(q.toLowerCase()));
-    list = list.filter((l) => l.currentBid <= maxPrice);
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (category !== 'all') params.set('category', category);
+    if (condition !== 'any') params.set('condition', condition);
+    if (maxPrice < 2500) params.set('maxPrice', String(maxPrice));
+
+    setLoading(true);
+    fetch(`/api/listings?${params.toString()}`, { signal: controller.signal })
+      .then((r) => r.json())
+      .then(({ listings: data }) => {
+        setListings((data ?? []).map(mapListing));
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') setLoading(false);
+      });
+  }, [q, category, condition, maxPrice]);
+
+  const sorted = useMemo(() => {
+    const list = [...listings];
     switch (sort) {
       case 'lowest':    list.sort((a, b) => a.currentBid - b.currentBid); break;
       case 'highest':   list.sort((a, b) => b.currentBid - a.currentBid); break;
@@ -37,14 +59,16 @@ export default function BrowseClient({ initialListings }) {
       default:          list.sort((a, b) => new Date(a.endsAt) - new Date(b.endsAt));
     }
     return list;
-  }, [initialListings, category, condition, sort, q, maxPrice]);
+  }, [listings, sort]);
+
+  const clearSearch = () => router.replace('/browse');
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-bold">Browse auctions</h1>
         <p className="text-sm text-ink-500 mt-1">
-          {filtered.length} active listing{filtered.length === 1 ? '' : 's'}
+          {loading ? 'Loading…' : `${sorted.length} active listing${sorted.length === 1 ? '' : 's'}`}
           {q ? ` matching "${q}"` : ''} · all sellers verified anonymous.
         </p>
       </div>
@@ -146,14 +170,14 @@ export default function BrowseClient({ initialListings }) {
         </aside>
 
         <div>
-          {filtered.length === 0 ? (
+          {sorted.length === 0 && !loading ? (
             <div className="card p-12 text-center">
               <div className="text-ink-900 font-semibold">No matching auctions</div>
               <div className="text-sm text-ink-500 mt-1">Try adjusting your filters or search.</div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-              {filtered.map((l) => (
+            <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 transition-opacity ${loading ? 'opacity-50' : ''}`}>
+              {sorted.map((l) => (
                 <ListingCard key={l.id} listing={l} />
               ))}
             </div>

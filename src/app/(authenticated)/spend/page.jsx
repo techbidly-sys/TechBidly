@@ -9,6 +9,8 @@ import {
   ShoppingBag,
   Download,
   Minus,
+  Trophy,
+  Target,
 } from 'lucide-react';
 
 // ── Formatting helpers ────────────────────────────────────────────────────────
@@ -179,6 +181,7 @@ export default function SpendDashboardPage() {
   const [allOrders, setAllOrders] = useState(null); // null = loading
   const [categories, setCategories] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [buyerMetrics, setBuyerMetrics] = useState(null);
   const [loadError, setLoadError] = useState(null);
 
   const [dateRange, setDateRange] = useState('ytd');
@@ -199,10 +202,12 @@ export default function SpendDashboardPage() {
       setAllOrders(json.orders ?? []);
       setCategories(json.categories ?? []);
       setSuppliers(json.suppliers ?? []);
+      setBuyerMetrics(json.buyerMetrics ?? null);
       setLoadError(null);
     } catch (e) {
       setLoadError(e.message);
       setAllOrders([]);
+      setBuyerMetrics(null);
     }
   }, [categoryFilter, supplierFilter]);
 
@@ -488,6 +493,40 @@ export default function SpendDashboardPage() {
               label="Orders in Range"
               value={stats.orderCount}
               icon={<ShoppingBag size={18} className="text-brand-600" />}
+            />
+          </div>
+
+          {/* Buyer bid performance */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <StatCard
+              label="Win Rate"
+              value={`${Number(buyerMetrics?.winRate ?? 0).toFixed(1)}%`}
+              icon={<Target size={18} className="text-emerald-600" />}
+            />
+            <StatCard
+              label="Listings Won"
+              value={Number(buyerMetrics?.listingsWon ?? 0)}
+              icon={<Trophy size={18} className="text-emerald-600" />}
+            />
+            <StatCard
+              label="Listings Lost"
+              value={Number(buyerMetrics?.listingsLost ?? 0)}
+              icon={<TrendingDown size={18} className="text-rose-500" />}
+            />
+            <StatCard
+              label="Value of Open Bids"
+              value={fmt(Number(buyerMetrics?.openBidsValue ?? 0))}
+              icon={<TrendingUp size={18} className="text-brand-600" />}
+            />
+            <StatCard
+              label="Value of Open Max Bids"
+              value={fmt(Number(buyerMetrics?.openMaxBidsValue ?? 0))}
+              icon={<BarChart2 size={18} className="text-brand-600" />}
+            />
+            <StatCard
+              label="Total Value Won"
+              value={fmt(Number(buyerMetrics?.totalValueWon ?? 0))}
+              icon={<ShoppingBag size={18} className="text-emerald-600" />}
             />
           </div>
 

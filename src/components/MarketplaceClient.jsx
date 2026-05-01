@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Filter, SlidersHorizontal, Search, ShoppingBag, Plus, Building2 } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -23,18 +23,39 @@ export default function MarketplaceClient({ initialItems }) {
   const [sort, setSort] = useState('newest');
   const [maxPrice, setMaxPrice] = useState(5000);
   const [bulkOnly, setBulkOnly] = useState(false);
+  const [loading, setLoading] = useState(false);
   const q = searchParams.get('q') ?? '';
+  const fetchController = useRef(null);
 
   const clearSearch = () => router.replace('/marketplace');
 
+  useEffect(() => {
+    if (fetchController.current) fetchController.current.abort();
+    const controller = new AbortController();
+    fetchController.current = controller;
+
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (category !== 'all') params.set('category', category);
+    if (condition !== 'any') params.set('condition', condition);
+    if (maxPrice < 5000) params.set('maxPrice', String(maxPrice));
+
+    setLoading(true);
+    fetch(`/api/marketplace?${params.toString()}`, { signal: controller.signal })
+      .then((r) => r.json())
+      .then(({ items: data }) => {
+        setItems(data ?? []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') setLoading(false);
+      });
+  }, [q, category, condition, maxPrice]);
+
   const filtered = useMemo(() => {
     let list = [...items];
-    if (category !== 'all') list = list.filter((i) => i.category === category);
-    if (condition !== 'any') list = list.filter((i) => i.condition === condition);
-    if (q) list = list.filter((i) => i.title.toLowerCase().includes(q.toLowerCase()));
-    list = list.filter((i) => Number(i.price) <= maxPrice);
+    // bulkOnly is a UI-only filter not easily expressed as a DB filter
     if (bulkOnly) list = list.filter((i) => (i.quantity_remaining ?? i.quantity ?? 0) >= 5 || i.pricing_tiers?.length > 0);
-
     switch (sort) {
       case 'price-low':  list.sort((a, b) => Number(a.price) - Number(b.price)); break;
       case 'price-high': list.sort((a, b) => Number(b.price) - Number(a.price)); break;
@@ -42,7 +63,7 @@ export default function MarketplaceClient({ initialItems }) {
       default:           list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }
     return list;
-  }, [items, category, condition, sort, q, maxPrice, bulkOnly]);
+  }, [items, sort, bulkOnly]);
 
   const handleBuy = useCallback(async (item) => {
     const res = await fetch(`/api/marketplace/${item.id}/purchase`, {
@@ -69,7 +90,7 @@ export default function MarketplaceClient({ initialItems }) {
         <div>
           <h1 className="font-display text-3xl font-bold">Marketplace</h1>
           <p className="text-sm text-ink-500 mt-1">
-            {filtered.length} item{filtered.length === 1 ? '' : 's'} available
+            {loading ? 'Loading…' : `${filtered.length} item${filtered.length === 1 ? '' : 's'} available`}
             {q ? ` matching "${q}"` : ''} · buy directly at fixed prices.
           </p>
         </div>
@@ -194,14 +215,14 @@ export default function MarketplaceClient({ initialItems }) {
         </aside>
 
         <div>
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && !loading ? (
             <div className="card p-12 text-center">
               <ShoppingBag size={32} className="mx-auto text-ink-300 mb-3" />
               <div className="text-ink-900 font-semibold">No items available</div>
               <div className="text-sm text-ink-500 mt-1">Try adjusting your filters or check back later.</div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+            <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 transition-opacity ${loading ? 'opacity-50' : ''}`}>
               {filtered.map((item) => (
                 <MarketplaceCard key={item.id} item={item} onBuy={handleBuy} />
               ))}

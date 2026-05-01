@@ -15,7 +15,7 @@ export async function GET(request) {
   const categoryFilter = searchParams.get('category') || '';
   const supplierFilter = searchParams.get('supplier') || '';
 
-  // Fetch marketplace orders + won auctions in parallel
+  // Fetch marketplace orders + user bids in parallel
   const [mktResult, bidsResult] = await Promise.all([
     supabaseAdmin
       .from('marketplace_orders')
@@ -31,8 +31,16 @@ export async function GET(request) {
   const rawMktOrders = mktResult.data ?? [];
   const userBids = bidsResult.data ?? [];
 
-  // Resolve won auction listings
+  // Resolve auction outcomes + bid performance metrics
   let wonOrders = [];
+  let buyerMetrics = {
+    winRate: 0,
+    listingsWon: 0,
+    listingsLost: 0,
+    openBidsValue: 0,
+    openMaxBidsValue: 0,
+    totalValueWon: 0,
+  };
   if (userBids.length > 0) {
     const bidMap = {};
     userBids.forEach((b) => {
@@ -41,15 +49,73 @@ export async function GET(request) {
     });
 
     const listingIds = Object.keys(bidMap).map(Number);
-    const { data: soldListings } = await supabaseAdmin
+    const [{ data: listings }, { data: allListingBids }] = await Promise.all([
+      supabaseAdmin
       .from('listings')
-      .select('id, title, category, seller_handle, current_bid, ends_at')
+      .select('id, title, category, seller_handle, current_bid, ends_at, status')
       .in('id', listingIds)
-      .eq('status', 'sold')
-      .order('ends_at', { ascending: true });
+      .order('ends_at', { ascending: true }),
+      supabaseAdmin
+        .from('bids')
+        .select('listing_id, buyer_id, amount, created_at')
+        .in('listing_id', listingIds)
+        .order('listing_id', { ascending: true })
+        .order('amount', { ascending: false })
+        .order('created_at', { ascending: false }),
+    ]);
 
-    wonOrders = (soldListings ?? [])
-      .filter((l) => bidMap[l.id] === Number(l.current_bid))
+    const topBidByListing = {};
+    (allListingBids ?? []).forEach((bid) => {
+      if (!topBidByListing[bid.listing_id]) topBidByListing[bid.listing_id] = bid;
+    });
+
+    const now = Date.now();
+    const closedListings = [];
+    const openListings = [];
+    (listings ?? []).forEach((listing) => {
+      const closedByTime = listing.ends_at ? new Date(listing.ends_at).getTime() <= now : false;
+      const closedByStatus = listing.status && listing.status !== 'active';
+      if (closedByTime || closedByStatus) closedListings.push(listing);
+      else openListings.push(listing);
+    });
+
+    const wonListings = closedListings.filter((listing) => {
+      const topBid = topBidByListing[listing.id];
+      return topBid?.buyer_id === user.id;
+    });
+
+    const lostListings = closedListings.filter((listing) => {
+      const topBid = topBidByListing[listing.id];
+      return !!topBid && topBid.buyer_id !== user.id;
+    });
+
+    const openBidsValue = openListings.reduce((sum, listing) => {
+      const topBid = topBidByListing[listing.id];
+      if (topBid?.buyer_id !== user.id) return sum;
+      return sum + Number(listing.current_bid ?? topBid.amount ?? 0);
+    }, 0);
+
+    const openMaxBidsValue = openListings.reduce((sum, listing) => (
+      sum + Number(bidMap[listing.id] ?? 0)
+    ), 0);
+
+    const totalValueWon = wonListings.reduce((sum, listing) => (
+      sum + Number(listing.current_bid ?? 0)
+    ), 0);
+
+    const closedCount = wonListings.length + lostListings.length;
+    const winRate = closedCount > 0 ? (wonListings.length / closedCount) * 100 : 0;
+
+    buyerMetrics = {
+      winRate,
+      listingsWon: wonListings.length,
+      listingsLost: lostListings.length,
+      openBidsValue,
+      openMaxBidsValue,
+      totalValueWon,
+    };
+
+    wonOrders = wonListings
       .map((l) => ({
         id: `TB-${String(l.id).padStart(5, '0')}`,
         title: l.title ?? 'Auction Item',
@@ -84,5 +150,5 @@ export async function GET(request) {
   if (categoryFilter) orders = orders.filter((o) => o.category === categoryFilter);
   if (supplierFilter) orders = orders.filter((o) => o.supplier === supplierFilter);
 
-  return NextResponse.json({ orders, categories, suppliers });
+  return NextResponse.json({ orders, categories, suppliers, buyerMetrics });
 }

@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server.js';
 import { supabaseAdmin } from '@/lib/supabase-admin.js';
 import { getProfileRole } from '@/lib/role-guard.js';
 import { stripe } from '@/lib/stripe-server.js';
+import { emailNotify } from '@/lib/email.js';
 
 export async function POST(request) {
   const supabase = await createSupabaseServerClient();
@@ -57,7 +58,7 @@ export async function POST(request) {
 
   const { data: listing, error: listingError } = await supabaseAdmin
     .from('listings')
-    .select('id, ends_at, status')
+    .select('id, title, ends_at, status')
     .eq('id', Number(listingId))
     .maybeSingle();
 
@@ -90,34 +91,26 @@ export async function POST(request) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  // Fetch listing title for notification bodies.
-  const { data: listing } = await supabaseAdmin
-    .from('listings')
-    .select('title')
-    .eq('id', Number(listingId))
-    .maybeSingle();
-
-  const listingTitle = listing?.title ?? 'an item';
-  const formattedAmount = `$${numericAmount.toLocaleString()}`;
+  const listingTitle = listing.title ?? 'an item';
+  const formattedAmount = numericAmount;
 
   const notificationsToInsert = [
     {
       user_id: user.id,
       type: 'bid_placed',
       title: 'Bid placed',
-      body: `${listingTitle} — you bid ${formattedAmount}`,
+      body: `${listingTitle} — you bid $${numericAmount.toLocaleString()}`,
       listing_id: Number(listingId),
       read: false,
     },
   ];
 
-  // Notify the previous top bidder that they've been outbid (skip if they bid again themselves).
   if (prevTopBid && prevTopBid.buyer_id !== user.id) {
     notificationsToInsert.push({
       user_id: prevTopBid.buyer_id,
       type: 'outbid',
       title: "You've been outbid",
-      body: `${listingTitle} — someone bid ${formattedAmount}`,
+      body: `${listingTitle} — someone bid $${numericAmount.toLocaleString()}`,
       listing_id: Number(listingId),
       read: false,
     });
@@ -126,6 +119,12 @@ export async function POST(request) {
   const { error: notifError } = await supabaseAdmin.from('notifications').insert(notificationsToInsert);
   if (notifError) {
     console.error('Notification insert error:', notifError);
+  }
+
+  // Fire-and-forget email notifications
+  emailNotify.bidPlaced(user.id, listingTitle, formattedAmount).catch(() => {});
+  if (prevTopBid && prevTopBid.buyer_id !== user.id) {
+    emailNotify.outbid(prevTopBid.buyer_id, listingTitle, formattedAmount).catch(() => {});
   }
 
   return NextResponse.json({ bid: data });

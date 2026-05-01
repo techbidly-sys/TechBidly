@@ -2,16 +2,41 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase-server.js';
 import { getProfileRole } from '@/lib/role-guard.js';
 
-export async function GET() {
+export async function GET(request) {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
+
+  const { searchParams } = new URL(request.url);
+  const q = searchParams.get('q')?.trim() ?? '';
+  const category = searchParams.get('category')?.trim() ?? '';
+  const condition = searchParams.get('condition')?.trim() ?? '';
+  const maxPrice = Number(searchParams.get('maxPrice')) || 0;
+  const limit = Math.min(Number(searchParams.get('limit')) || 50, 100);
+  const offset = Math.max(Number(searchParams.get('offset')) || 0, 0);
+
+  let query = supabase
     .from('marketplace_items')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('status', 'active')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (q) {
+    query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%`);
+  }
+  if (category) {
+    query = query.eq('category', category);
+  }
+  if (condition) {
+    query = query.eq('condition', condition);
+  }
+  if (maxPrice > 0) {
+    query = query.lte('price', maxPrice);
+  }
+
+  const { data, error, count } = await query;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ items: data ?? [] });
+  return NextResponse.json({ items: data ?? [], total: count ?? 0, offset, limit });
 }
 
 export async function POST(request) {
@@ -59,5 +84,6 @@ export async function POST(request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data?.id) return NextResponse.json({ error: 'Marketplace listing created without an identifier' }, { status: 500 });
   return NextResponse.json({ item: data });
 }
