@@ -22,6 +22,7 @@ import {
   Building2,
   Clock,
 } from 'lucide-react';
+import LogoUploader from '@/components/LogoUploader.jsx';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, AddressElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { user } from '@/data/mockData.js';
@@ -59,9 +60,15 @@ export default function Profile() {
   return (
     <div className="space-y-6">
       <header className="card p-6 flex items-center gap-5">
-        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-ink-900 to-ink-700 grid place-items-center text-white text-xl font-bold">
-          {initial_letter}
-        </div>
+        {profile?.logo_url ? (
+          <div className="h-16 w-16 rounded-2xl overflow-hidden border border-ink-100 bg-white flex items-center justify-center flex-shrink-0">
+            <img src={profile.logo_url} alt="Company logo" className="h-full w-full object-contain" />
+          </div>
+        ) : (
+          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-ink-900 to-ink-700 grid place-items-center text-white text-xl font-bold flex-shrink-0">
+            {initial_letter}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="font-display text-2xl font-bold">{handle}</h1>
@@ -147,6 +154,7 @@ function AccountTab({ email, profile }) {
   const [mfaEnabled, setMfaEnabled] = useState(null);
   const [isAnon, setIsAnon] = useState(display_anonymous ?? false);
   const [anonSaving, setAnonSaving] = useState(false);
+  const [logoUrl, setLogoUrl] = useState(profile?.logo_url ?? null);
 
   useEffect(() => {
     supabase.auth.mfa.listFactors().then(({ data }) => {
@@ -216,6 +224,12 @@ function AccountTab({ email, profile }) {
             value={mfaEnabled === null ? '…' : mfaEnabled ? 'Enabled' : 'Not set up'}
             hint="Manage in Privacy & security tab"
           />
+        </div>
+
+        {/* Company logo */}
+        <div className="rounded-xl border border-ink-100 p-4">
+          <div className="text-sm font-semibold text-ink-900 mb-3">Company logo</div>
+          <LogoUploader currentUrl={logoUrl} onUploaded={setLogoUrl} />
         </div>
 
         {/* Display anonymous toggle */}

@@ -174,7 +174,7 @@ export default function TopBar() {
               onClick={() => { setOpen((v) => !v); setNotifOpen(false); }}
               className="flex items-center gap-2 rounded-xl pl-1 pr-2.5 py-1 hover:bg-ink-100 transition"
             >
-              <Avatar initial={profile?.handle?.charAt(0).toUpperCase() ?? '?'} />
+              <Avatar initial={profile?.handle?.charAt(0).toUpperCase() ?? '?'} logoUrl={profile?.logo_url} />
               <div className="hidden sm:block text-left">
                 <div className="text-sm font-semibold text-ink-900 leading-tight">
                   {profile?.handle ?? '…'}
@@ -191,7 +191,14 @@ export default function TopBar() {
   );
 }
 
-function Avatar({ initial = '?' }) {
+function Avatar({ initial = '?', logoUrl }) {
+  if (logoUrl) {
+    return (
+      <div className="h-9 w-9 rounded-xl overflow-hidden ring-2 ring-white shadow-glow bg-white flex items-center justify-center flex-shrink-0">
+        <img src={logoUrl} alt="Company logo" className="h-full w-full object-contain" />
+      </div>
+    );
+  }
   return (
     <div
       className="h-9 w-9 rounded-xl grid place-items-center text-white text-sm font-semibold ring-2 ring-white shadow-glow"

@@ -36,6 +36,7 @@ export default function ListingDetail() {
   const [isWatchlisted, setIsWatchlisted] = useState(false);
   const [auctionResult, setAuctionResult] = useState(null);
   const [nowTs, setNowTs] = useState(Date.now());
+  const [sellerLogo, setSellerLogo] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -87,6 +88,20 @@ export default function ListingDetail() {
     const timer = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!listing?.seller_id) return;
+    supabase
+      .from('profiles')
+      .select('logo_url, display_anonymous')
+      .eq('id', listing.seller_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data && !data.display_anonymous && data.logo_url) {
+          setSellerLogo(data.logo_url);
+        }
+      });
+  }, [listing?.seller_id]);
 
   useEffect(() => {
     if (!id) return;
@@ -196,8 +211,23 @@ export default function ListingDetail() {
           />
 
           <div className="card p-6">
-            <div className="flex items-center gap-2 font-semibold">
-              <Info size={16} /> About the seller
+            <div className="flex items-center gap-3">
+              {sellerLogo ? (
+                <div className="h-10 w-10 rounded-xl overflow-hidden border border-ink-100 bg-white flex items-center justify-center flex-shrink-0">
+                  <img src={sellerLogo} alt="Seller logo" className="h-full w-full object-contain" />
+                </div>
+              ) : (
+                <div
+                  className="h-10 w-10 rounded-xl grid place-items-center text-white text-sm font-bold flex-shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 60%, #6d28d9 100%)' }}
+                >
+                  {listing.seller.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="font-semibold text-ink-900">{listing.seller}</span>
+              <div className="ml-auto flex items-center gap-1.5 text-sm font-semibold text-ink-700">
+                <Info size={16} /> About the seller
+              </div>
             </div>
             <div className="mt-4 grid sm:grid-cols-3 gap-4">
               <SellerStat label="Identity" value="Verified anonymous" sub="ID + payout verified" />

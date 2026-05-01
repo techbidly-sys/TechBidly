@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin.js';
+import { resolveVerificationStatus } from '@/lib/tax-id.js';
 
 export async function POST(request) {
   const authHeader = request.headers.get('Authorization');
@@ -58,7 +59,7 @@ export async function POST(request) {
     company_name: handle,
     tax_id: taxId.trim(),
     tax_id_country: taxCountry,
-    verification_status: 'pending',
+    verification_status: resolveVerificationStatus(taxId, taxCountry),
     display_anonymous: false,
   };
 

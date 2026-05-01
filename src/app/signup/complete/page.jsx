@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, Store, CheckCircle2, XCircle, Loader2, UserPlus } from 'lucide-react';
+import { ShoppingCart, Store, CheckCircle2, XCircle, Loader2, UserPlus, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase.js';
 
 const COUNTRY_OPTIONS = [
@@ -39,6 +39,9 @@ export default function SignupComplete() {
   const [nameAvailability, setNameAvailability] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const logoInputRef = useRef(null);
   const debounceRef = useRef(null);
 
   useEffect(() => {
@@ -67,7 +70,14 @@ export default function SignupComplete() {
 
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const taxLabel = COUNTRY_OPTIONS.find((c) => c.code === form.taxCountry)?.taxLabel ?? 'Tax ID';
-  const stepCount = form.role === 'seller' ? 3 : 2;
+  const stepCount = form.role === 'seller' ? 4 : 3;
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -93,6 +103,13 @@ export default function SignupComplete() {
         const { error: msg } = await res.json();
         throw new Error(msg ?? 'Failed to create profile');
       }
+
+      if (logoFile) {
+        const fd = new FormData();
+        fd.append('logo', logoFile);
+        await fetch('/api/upload/logo', { method: 'POST', body: fd }).catch(() => {});
+      }
+
       localStorage.setItem(`techbidly_active_role_${user.id}`, form.role);
       router.replace('/');
     } catch (err) {
@@ -204,10 +221,50 @@ export default function SignupComplete() {
               </div>
             </section>
 
-            {/* ── Section 3: Business address (sellers only) ── */}
+            {/* ── Section 3: Company logo (optional) ── */}
+            {form.role && (
+              <section>
+                <SectionHeader n={3} title="Company logo" />
+                <p className="text-xs text-ink-500 mt-1 mb-3">
+                  Optional — shown on your listings and bids when not anonymous.
+                </p>
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="relative h-16 w-16 rounded-2xl overflow-hidden border-2 border-dashed border-ink-300 hover:border-brand-500 transition flex items-center justify-center bg-ink-50 flex-shrink-0"
+                  >
+                    {logoPreview ? (
+                      <img src={logoPreview} alt="Logo preview" className="h-full w-full object-contain bg-white" />
+                    ) : (
+                      <Upload size={20} className="text-ink-400" />
+                    )}
+                  </button>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => logoInputRef.current?.click()}
+                      className="btn-outline text-sm"
+                    >
+                      {logoPreview ? 'Change logo' : 'Upload logo'}
+                    </button>
+                    <p className="text-xs text-ink-500 mt-1">PNG, JPG or WebP · max 2 MB · optional</p>
+                  </div>
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handleLogoChange}
+                  />
+                </div>
+              </section>
+            )}
+
+            {/* ── Section 4: Business address (sellers only) ── */}
             {form.role === 'seller' && (
               <section>
-                <SectionHeader n={3} title="Business address" />
+                <SectionHeader n={4} title="Business address" />
                 <p className="text-xs text-ink-500 mt-1 mb-3">
                   Your city and country are shown on your listings. Full address is only shared with the buyer after a successful sale.
                 </p>
