@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin.js';
 import { stripe } from '@/lib/stripe-server.js';
+import { requireAdmin } from '@/lib/admin-guard.js';
 
 function hasAuctionEnded(listing) {
   if (!listing?.ends_at) return false;
@@ -77,6 +78,9 @@ export async function GET(_request, { params }) {
 
 // Admin/system endpoint to explicitly capture payment for an auction winner
 export async function POST(_request, { params }) {
+  const { forbidden } = await requireAdmin();
+  if (forbidden) return forbidden;
+
   const listingId = Number(params.id);
   if (!Number.isFinite(listingId)) {
     return NextResponse.json({ error: 'Invalid listing id' }, { status: 400 });

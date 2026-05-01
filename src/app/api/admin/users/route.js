@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data: profiles } = await supabaseAdmin
     .from('profiles')
-    .select('id, handle, role, created_at');
+    .select('id, handle, role, created_at, verification_status, tax_id');
 
   const profileMap = {};
   (profiles ?? []).forEach((p) => {

@@ -21,6 +21,10 @@ import {
   Lock,
   Building2,
   Clock,
+  BadgeCheck,
+  Upload,
+  FileText,
+  AlertCircle,
 } from 'lucide-react';
 import LogoUploader from '@/components/LogoUploader.jsx';
 import { loadStripe } from '@stripe/stripe-js';
@@ -33,6 +37,7 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
 
 const TABS = [
   { id: 'account', label: 'Account', icon: User },
+  { id: 'verification', label: 'Verification', icon: BadgeCheck },
   { id: 'billing', label: 'Billing', icon: CreditCard },
   { id: 'shipping', label: 'Shipping', icon: MapPin },
   { id: 'security', label: 'Privacy & security', icon: ShieldCheck },
@@ -107,6 +112,7 @@ export default function Profile() {
 
         <div className="space-y-5">
           {tab === 'account' && <AccountTab email={session?.user?.email} profile={profile} />}
+          {tab === 'verification' && <VerificationTab profile={profile} />}
           {tab === 'billing' && <BillingTab />}
           {tab === 'shipping' && <ShippingTab />}
           {tab === 'security' && <SecurityTab />}
@@ -1134,6 +1140,172 @@ function SecurityTab() {
               privacy.allowSellerMessages ? 'translate-x-5' : 'translate-x-0'
             }`} />
           </button>
+        </div>
+      </Card>
+    </>
+  );
+}
+
+const DOC_TYPES = [
+  { id: 'business_license', label: 'Business License', hint: 'Company registration or business license document' },
+  { id: 'bank_statement',   label: 'Bank Statement',   hint: 'Recent statement showing company name (last 3 months)' },
+  { id: 'trade_reference',  label: 'Trade Reference',  hint: 'Letter from a trade partner or supplier' },
+];
+
+const DOC_STATUS_CONFIG = {
+  pending:  { label: 'Under review', classes: 'bg-amber-50 text-amber-700',   icon: Clock },
+  approved: { label: 'Approved',     classes: 'bg-emerald-50 text-emerald-700', icon: CheckCircle2 },
+  rejected: { label: 'Rejected',     classes: 'bg-rose-50 text-rose-700',     icon: XCircle },
+};
+
+function VerificationTab({ profile }) {
+  const { verification_status } = profile ?? {};
+  const [docs, setDocs] = useState([]);
+  const [loadingDocs, setLoadingDocs] = useState(true);
+  const [uploading, setUploading] = useState(null); // document_type being uploaded
+  const [uploadErrors, setUploadErrors] = useState({});
+  const [uploadSuccess, setUploadSuccess] = useState({});
+
+  const verif = VERIFICATION_CONFIG[verification_status] ?? VERIFICATION_CONFIG.pending;
+  const VerifIcon = verif.icon;
+
+  const fetchDocs = async () => {
+    setLoadingDocs(true);
+    try {
+      const res = await fetch('/api/kyb/documents');
+      const data = await res.json();
+      setDocs(data.verifications ?? []);
+    } catch {
+      setDocs([]);
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
+  useEffect(() => { fetchDocs(); }, []);
+
+  const handleUpload = async (documentType, file) => {
+    setUploading(documentType);
+    setUploadErrors((p) => ({ ...p, [documentType]: '' }));
+    setUploadSuccess((p) => ({ ...p, [documentType]: false }));
+
+    const form = new FormData();
+    form.append('file', file);
+    form.append('document_type', documentType);
+
+    try {
+      const res = await fetch('/api/kyb/documents', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        setUploadErrors((p) => ({ ...p, [documentType]: data.error ?? 'Upload failed' }));
+      } else {
+        setUploadSuccess((p) => ({ ...p, [documentType]: true }));
+        await fetchDocs();
+        setTimeout(() => setUploadSuccess((p) => ({ ...p, [documentType]: false })), 3000);
+      }
+    } catch {
+      setUploadErrors((p) => ({ ...p, [documentType]: 'Network error. Please try again.' }));
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  // Latest submission per doc type
+  const latestByType = {};
+  docs.forEach((d) => { if (!latestByType[d.document_type]) latestByType[d.document_type] = d; });
+
+  return (
+    <>
+      <Card
+        title="Business verification"
+        subtitle="Submit documents so TechBidly can verify your company. Verified businesses display a badge on their listings and profile."
+      >
+        {/* Overall status banner */}
+        <div className={`flex items-center gap-3 rounded-xl px-4 py-3 mb-5 ${verif.classes}`}>
+          <VerifIcon size={16} className="flex-shrink-0" />
+          <div>
+            <div className="font-semibold text-sm">{verif.label}</div>
+            {verification_status === 'pending' && (
+              <div className="text-xs mt-0.5">Documents are being reviewed. We&apos;ll notify you when complete.</div>
+            )}
+            {verification_status === 'verified' && (
+              <div className="text-xs mt-0.5">Your business is verified. The Verified Business badge is now visible on your listings.</div>
+            )}
+            {verification_status === 'rejected' && (
+              <div className="text-xs mt-0.5">Verification was not approved. Please re-upload corrected documents below.</div>
+            )}
+          </div>
+        </div>
+
+        {loadingDocs ? (
+          <div className="flex items-center gap-2 text-sm text-ink-500 py-4">
+            <Loader2 size={14} className="animate-spin" /> Loading documents…
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {DOC_TYPES.map(({ id, label, hint }) => {
+              const latest = latestByType[id];
+              const statusCfg = latest ? (DOC_STATUS_CONFIG[latest.status] ?? DOC_STATUS_CONFIG.pending) : null;
+              const StatusIcon = statusCfg?.icon;
+              const isUploading = uploading === id;
+              const err = uploadErrors[id];
+              const success = uploadSuccess[id];
+
+              return (
+                <div key={id} className="rounded-xl border border-ink-100 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 h-8 w-8 rounded-lg bg-ink-50 grid place-items-center flex-shrink-0">
+                        <FileText size={15} className="text-ink-500" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-sm text-ink-900">{label}</div>
+                        <div className="text-xs text-ink-500 mt-0.5">{hint}</div>
+                        {latest && statusCfg && (
+                          <span className={`inline-flex items-center gap-1 chip text-[10px] mt-1.5 ${statusCfg.classes}`}>
+                            <StatusIcon size={10} /> {statusCfg.label}
+                            {latest.status === 'rejected' && latest.notes && (
+                              <span className="ml-1 font-normal">· {latest.notes}</span>
+                            )}
+                          </span>
+                        )}
+                        {!latest && (
+                          <span className="inline-flex items-center gap-1 chip text-[10px] mt-1.5 bg-ink-50 text-ink-500">
+                            <AlertCircle size={10} /> Not submitted
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <label className={`btn-outline text-xs cursor-pointer flex items-center gap-1.5 flex-shrink-0 ${isUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                      {isUploading
+                        ? <><Loader2 size={12} className="animate-spin" /> Uploading…</>
+                        : success
+                        ? <><CheckCircle2 size={12} className="text-emerald-600" /> Uploaded</>
+                        : <><Upload size={12} /> {latest ? 'Replace' : 'Upload'}</>
+                      }
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        className="sr-only"
+                        disabled={isUploading}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleUpload(id, f);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {err && <p className="text-xs text-rose-600 mt-2">{err}</p>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mt-5 rounded-xl bg-ink-50 px-4 py-3 text-xs text-ink-600">
+          Accepted formats: PDF, JPEG, PNG · Max 10 MB per file · Documents are stored securely and only visible to TechBidly reviewers.
         </div>
       </Card>
     </>

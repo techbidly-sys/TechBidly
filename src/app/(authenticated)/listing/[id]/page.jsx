@@ -37,6 +37,7 @@ export default function ListingDetail() {
   const [auctionResult, setAuctionResult] = useState(null);
   const [nowTs, setNowTs] = useState(Date.now());
   const [sellerLogo, setSellerLogo] = useState(null);
+  const [sellerVerified, setSellerVerified] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -93,13 +94,14 @@ export default function ListingDetail() {
     if (!listing?.seller_id) return;
     supabase
       .from('profiles')
-      .select('logo_url, display_anonymous')
+      .select('logo_url, display_anonymous, verification_status')
       .eq('id', listing.seller_id)
       .maybeSingle()
       .then(({ data }) => {
         if (data && !data.display_anonymous && data.logo_url) {
           setSellerLogo(data.logo_url);
         }
+        setSellerVerified(data?.verification_status === 'verified');
       });
   }, [listing?.seller_id]);
 
@@ -224,7 +226,14 @@ export default function ListingDetail() {
                   {listing.seller.charAt(0).toUpperCase()}
                 </div>
               )}
-              <span className="font-semibold text-ink-900">{listing.seller}</span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-semibold text-ink-900">{listing.seller}</span>
+                {sellerVerified && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 mt-0.5">
+                    <ShieldCheck size={10} className="flex-shrink-0" /> Verified Business
+                  </span>
+                )}
+              </div>
               <div className="ml-auto flex items-center gap-1.5 text-sm font-semibold text-ink-700">
                 <Info size={16} /> About the seller
               </div>

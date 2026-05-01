@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from './supabase-server.js';
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'techbidly@gmail.com';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+if (!ADMIN_EMAIL) throw new Error('ADMIN_EMAIL environment variable is not set');
 
 export async function requireAdmin() {
   const supabase = await createSupabaseServerClient();
