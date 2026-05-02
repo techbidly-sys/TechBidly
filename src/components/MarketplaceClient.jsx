@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Filter, SlidersHorizontal, Search, ShoppingBag, Plus, Building2 } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -64,25 +64,6 @@ export default function MarketplaceClient({ initialItems }) {
     }
     return list;
   }, [items, sort, bulkOnly]);
-
-  const handleBuy = useCallback(async (item) => {
-    const res = await fetch(`/api/marketplace/${item.id}/purchase`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ quantity: 1 }),
-    });
-    if (!res.ok) {
-      const body = await res.json();
-      throw new Error(body.error ?? 'Purchase failed');
-    }
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === item.id
-          ? { ...i, quantity_remaining: Math.max(0, (i.quantity_remaining ?? i.quantity ?? 1) - 1) }
-          : i
-      )
-    );
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -224,7 +205,7 @@ export default function MarketplaceClient({ initialItems }) {
           ) : (
             <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 transition-opacity ${loading ? 'opacity-50' : ''}`}>
               {filtered.map((item) => (
-                <MarketplaceCard key={item.id} item={item} onBuy={handleBuy} />
+                <MarketplaceCard key={item.id} item={item} />
               ))}
             </div>
           )}

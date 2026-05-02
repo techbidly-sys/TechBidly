@@ -44,6 +44,7 @@ export default function MarketplaceItemDetail() {
   const [buying, setBuying] = useState(false);
   const [purchased, setPurchased] = useState(false);
   const [buyError, setBuyError] = useState('');
+  const [showConfirmBar, setShowConfirmBar] = useState(false);
 
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
@@ -324,14 +325,12 @@ export default function MarketplaceItemDetail() {
                 </div>
               ) : (
                 <button
-                  onClick={handleBuy}
-                  disabled={buying || soldOut}
+                  onClick={() => setShowConfirmBar(true)}
+                  disabled={soldOut}
                   className="btn-brand w-full text-base py-3 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <ShoppingCart size={18} />
-                  {buying
-                    ? 'Processing…'
-                    : soldOut
+                  {soldOut
                     ? 'Sold Out'
                     : qty > 1
                     ? `Buy ${qty} units · $${totalPrice.toLocaleString()}`
@@ -394,6 +393,37 @@ export default function MarketplaceItemDetail() {
               <div className="font-semibold text-emerald-800 text-sm">Review submitted — thanks!</div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Confirmation bar */}
+      <div
+        className={`fixed bottom-0 inset-x-0 z-50 flex justify-center px-4 pb-6 transition-all duration-300 ${
+          showConfirmBar ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'
+        }`}
+      >
+        <div className="bg-ink-900 text-white rounded-2xl shadow-2xl px-6 py-4 flex items-center gap-4 w-full max-w-lg">
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-sm">Confirm purchase</div>
+            <div className="text-xs text-ink-300 mt-0.5 truncate">
+              {item?.title} · {qty > 1 ? `${qty} units · ` : ''}${totalPrice.toLocaleString()}
+            </div>
+          </div>
+          <button
+            onClick={() => setShowConfirmBar(false)}
+            disabled={buying}
+            className="text-sm text-ink-400 hover:text-white transition px-3 py-1.5 rounded-lg disabled:opacity-40"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => { await handleBuy(); setShowConfirmBar(false); }}
+            disabled={buying}
+            className="btn-brand text-sm px-5 py-2 disabled:opacity-60"
+          >
+            <ShoppingCart size={14} />
+            {buying ? 'Processing…' : 'Confirm'}
+          </button>
         </div>
       </div>
 

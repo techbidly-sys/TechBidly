@@ -1,36 +1,19 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { MapPin, Heart, ShoppingCart, Star, CheckCircle2, Package, Store, Building2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { MapPin, Heart, ShoppingCart, Star, Package, Store, Building2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext.jsx';
 
-export default function MarketplaceCard({ item, onBuy }) {
+export default function MarketplaceCard({ item }) {
   const { role } = useAuth();
-  const [buying, setBuying] = useState(false);
-  const [bought, setBought] = useState(false);
-  const [error, setError] = useState('');
+  const router = useRouter();
 
   const stockRemaining = item.quantity_remaining ?? item.quantity ?? 1;
   const soldOut = stockRemaining === 0;
   const lowStock = !soldOut && stockRemaining <= 3;
   const isBulk = !soldOut && (stockRemaining >= 5 || item.pricing_tiers?.length > 0);
   const location = [item.city, item.country].filter(Boolean).join(', ');
-
-  const handleBuy = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setError('');
-    setBuying(true);
-    try {
-      await onBuy(item);
-      setBought(true);
-    } catch (err) {
-      setError(err.message ?? 'Purchase failed');
-    } finally {
-      setBuying(false);
-    }
-  };
 
   return (
     <div className="group card overflow-hidden flex flex-col hover:shadow-glow hover:-translate-y-1 transition relative">
@@ -104,26 +87,18 @@ export default function MarketplaceCard({ item, onBuy }) {
             </div>
           </div>
 
-          {error && (
-            <p className="text-xs text-rose-600 mb-2">{error}</p>
-          )}
-
           {role === 'seller' ? (
             <div className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-medium bg-ink-50 text-ink-500 border border-ink-200">
               <Store size={13} /> Seller account — cannot purchase
             </div>
-          ) : bought ? (
-            <div className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <CheckCircle2 size={15} /> Purchased!
-            </div>
           ) : (
             <button
-              onClick={handleBuy}
-              disabled={buying || soldOut}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/marketplace/${item.id}`); }}
+              disabled={soldOut}
               className="btn-brand w-full disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <ShoppingCart size={15} />
-              {buying ? 'Processing…' : soldOut ? 'Sold Out' : 'Buy Now'}
+              {soldOut ? 'Sold Out' : 'Buy Now'}
             </button>
           )}
         </div>
