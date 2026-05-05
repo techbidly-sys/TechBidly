@@ -29,5 +29,6 @@ export function mapListing(row) {
     featured: row.featured ?? false,
     status: row.status ?? 'active',
     seller_id: row.seller_id,
+    seller_verified: row.seller_verified ?? false,
   };
 }

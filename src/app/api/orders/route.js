@@ -38,7 +38,8 @@ export async function GET() {
       .from('listings')
       .select('*')
       .eq('seller_id', user.id)
-      .eq('status', 'sold')
+      .in('status', ['sold', 'ended'])
+      .gt('bid_count', 0)
       .order('ends_at', { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

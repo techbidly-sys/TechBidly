@@ -32,7 +32,20 @@ export async function fetchListingsServer({ q = '', category = '', condition = '
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).map(mapListing);
+
+  const rows = data ?? [];
+  const sellerIds = [...new Set(rows.map((l) => l.seller_id).filter(Boolean))];
+  let verifiedSet = new Set();
+  if (sellerIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .in('id', sellerIds)
+      .eq('verification_status', 'verified');
+    verifiedSet = new Set((profiles ?? []).map((p) => p.id));
+  }
+
+  return rows.map((l) => mapListing({ ...l, seller_verified: verifiedSet.has(l.seller_id) }));
 }
 
 export async function fetchListingByIdServer(id) {

@@ -10,3 +10,6 @@ out
 .vercel
 *.tsbuildinfo
 .claude/
+
+# Local Netlify folder
+.netlify

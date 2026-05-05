@@ -44,7 +44,20 @@ export async function GET(request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ listings: data ?? [], total: count ?? 0, offset, limit });
+  const rows = data ?? [];
+  const sellerIds = [...new Set(rows.map((l) => l.seller_id).filter(Boolean))];
+  let verifiedSet = new Set();
+  if (sellerIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .in('id', sellerIds)
+      .eq('verification_status', 'verified');
+    verifiedSet = new Set((profiles ?? []).map((p) => p.id));
+  }
+
+  const listings = rows.map((l) => ({ ...l, seller_verified: verifiedSet.has(l.seller_id) }));
+  return NextResponse.json({ listings, total: count ?? 0, offset, limit });
 }
 
 export async function POST(request) {

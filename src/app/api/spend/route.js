@@ -116,6 +116,7 @@ export async function GET(request) {
     };
 
     wonOrders = wonListings
+      .filter((l) => !l.ends_at || new Date(l.ends_at).getTime() <= now)
       .map((l) => ({
         id: `TB-${String(l.id).padStart(5, '0')}`,
         title: l.title ?? 'Auction Item',

@@ -93,14 +93,25 @@ export async function runAuctionLifecycleMaintenance() {
     }
 
     // Fire-and-forget email notifications (imported lazily to avoid circular deps)
-    if (result.winnerId) {
-      import('./email.js').then(({ emailNotify }) => {
-        const title = listing.title ?? 'an item';
-        if (result.charged) {
-          emailNotify.auctionWon(result.winnerId, title, result.amount).catch(() => {});
-        }
-      }).catch(() => {});
-    }
+    import('./email.js').then(async ({ emailNotify }) => {
+      const title = listing.title ?? 'an item';
+
+      if (result.winnerId && result.charged) {
+        emailNotify.auctionWon(result.winnerId, title, result.amount).catch(() => {});
+      }
+
+      // Notify all other bidders they lost
+      const { data: loserBids } = await supabaseAdmin
+        .from('bids')
+        .select('buyer_id')
+        .eq('listing_id', listing.id)
+        .neq('buyer_id', result.winnerId ?? '');
+
+      const loserIds = [...new Set((loserBids ?? []).map((b) => b.buyer_id))];
+      for (const loserId of loserIds) {
+        emailNotify.auctionLost(loserId, title).catch(() => {});
+      }
+    }).catch(() => {});
   }
 
   // End any remaining active listings that timed out (shouldn't be many after the loop above)

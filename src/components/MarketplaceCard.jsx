@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MapPin, Heart, ShoppingCart, Star, Package, Store, Building2 } from 'lucide-react';
+import { MapPin, Heart, ShoppingCart, Star, Package, Store, Building2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext.jsx';
 
 export default function MarketplaceCard({ item }) {
@@ -56,10 +56,15 @@ export default function MarketplaceCard({ item }) {
       <Link href={`/marketplace/${item.id}`} className="absolute inset-0 z-0" aria-label={item.title} />
 
       <div className="p-4 flex-1 flex flex-col relative z-10">
-        <div className="flex items-center gap-2 text-[11px]">
+        <div className="flex items-center gap-2 text-[11px] flex-wrap">
           <span className="chip bg-brand-50 text-brand-700">{item.condition}</span>
           <span className="text-ink-400">·</span>
           <span className="text-ink-500 capitalize">{item.category}</span>
+          {item.seller_verified && (
+            <span className="chip bg-emerald-50 text-emerald-700 flex items-center gap-1">
+              <ShieldCheck size={10} /> Verified
+            </span>
+          )}
         </div>
         <h3 className="mt-2 font-semibold text-ink-900 line-clamp-2 leading-snug">{item.title}</h3>
         {location && (

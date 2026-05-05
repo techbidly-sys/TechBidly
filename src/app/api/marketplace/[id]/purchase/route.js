@@ -80,7 +80,14 @@ export async function POST(request, { params }) {
     paymentMethodId = methods.data[0].id;
   }
 
-  const totalCents = Math.round(Number(item.price) * qty * 100);
+  // Apply volume pricing tier if applicable
+  let unitPrice = Number(item.price);
+  if (item.pricing_tiers?.length > 0) {
+    const sorted = [...item.pricing_tiers].sort((a, b) => b.minQty - a.minQty);
+    const tier = sorted.find((t) => qty >= Number(t.minQty ?? t.min_qty));
+    if (tier) unitPrice = Number(tier.price);
+  }
+  const totalCents = Math.round(unitPrice * qty * 100);
 
   // Create order in pending_payment state before charging
   const { data: order, error: orderError } = await supabaseAdmin
@@ -89,7 +96,7 @@ export async function POST(request, { params }) {
       item_id: id,
       buyer_id: user.id,
       quantity: qty,
-      total_price: Number(item.price) * qty,
+      total_price: unitPrice * qty,
       status: 'pending_payment',
     })
     .select()
@@ -148,7 +155,7 @@ export async function POST(request, { params }) {
     })
     .eq('id', id);
 
-  emailNotify.purchaseConfirmed(user.id, item.title, Number(item.price) * qty).catch(() => {});
+  emailNotify.purchaseConfirmed(user.id, item.title, unitPrice * qty).catch(() => {});
 
   return NextResponse.json({ order: { ...order, status: 'confirmed' } });
 }
