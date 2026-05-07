@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import React from 'react';
 import {
   Search, ShieldBan, ShieldCheck, Trash2, Loader2,
   CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp,
@@ -233,8 +234,8 @@ export default function AdminUsers() {
                 const isExpanded = expandedId === u.id;
 
                 return (
-                  <>
-                    <tr key={u.id} className="hover:bg-ink-50/50 transition-colors">
+                  <React.Fragment key={u.id}>
+                    <tr className="hover:bg-ink-50/50 transition-colors">
                       <td className="px-6 py-4 font-medium text-ink-800">{u.email}</td>
                       <td className="px-6 py-4 text-ink-500">
                         {u.profiles.length > 0 ? (
@@ -310,7 +311,7 @@ export default function AdminUsers() {
                         onDecision={(newStatus) => handleVerifDecision(u.id, newStatus)}
                       />
                     )}
-                  </>
+                  </React.Fragment>
                 );
               })}
               {filtered.length === 0 && (

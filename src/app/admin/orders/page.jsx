@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Search, Package, Truck, CheckCircle2, Clock } from 'lucide-react';
+import { Search, Package, Truck, CheckCircle2, Clock, XCircle } from 'lucide-react';
 
 function fmt(dateStr) {
   if (!dateStr) return '—';
@@ -9,9 +9,11 @@ function fmt(dateStr) {
 }
 
 const STATUS_CONFIG = {
-  processing: { label: 'Processing', chip: 'bg-ink-100 text-ink-700', Icon: Clock },
-  shipped:    { label: 'Shipped',    chip: 'bg-brand-50 text-brand-700', Icon: Truck },
-  delivered:  { label: 'Delivered',  chip: 'bg-emerald-50 text-emerald-700', Icon: CheckCircle2 },
+  processing:      { label: 'Processing',     chip: 'bg-ink-100 text-ink-700',       Icon: Clock },
+  shipped:         { label: 'Shipped',         chip: 'bg-brand-50 text-brand-700',    Icon: Truck },
+  delivered:       { label: 'Delivered',       chip: 'bg-emerald-50 text-emerald-700', Icon: CheckCircle2 },
+  payment_failed:  { label: 'Payment failed',  chip: 'bg-red-50 text-red-600',        Icon: XCircle },
+  payment_pending: { label: 'Payment pending', chip: 'bg-amber-50 text-amber-700',    Icon: Clock },
 };
 
 export default function AdminOrders() {
