@@ -33,7 +33,7 @@ export async function POST(req) {
       ],
       response_format: { type: 'json_object' },
       temperature: 0.7,
-      max_tokens: 400,
+      max_completion_tokens: 400,
     });
 
     const raw = completion.choices[0]?.message?.content?.trim() ?? '{}';
