@@ -10,25 +10,6 @@ const STARTER_PROMPTS = [
   'Compare Pixel 8 Pro vs Galaxy S24 Ultra for resale value.',
 ];
 
-const CANNED_RESPONSES = {
-  default:
-    "Based on recent TechBidly closings, the fair-bid range for that item sits around $880–$960. I'd anchor at $895 and snipe up to $945 in the final 30 seconds.",
-  listing:
-    "Here's a draft you can paste into the Sell page:\n\n• Title: \"MacBook Pro 14\\\" M3 Pro — 18GB / 1TB Space Black\"\n• Condition: Excellent · Battery cycles <80\n• Highlight box, charger, AppleCare+ until 2026.\n• Suggested starting bid: $1,200 · Reserve: $1,650.",
-  bidding:
-    "Quick checklist before bidding:\n1. Confirm seller's anonymized rating (4.8+ is solid).\n2. Check city/country shipping origin for customs.\n3. Look for battery cycles, IMEI status, and box contents.\n4. Set a max bid — don't chase past your ceiling.",
-  compare:
-    "Pixel 8 Pro tends to depreciate ~12% faster than the S24 Ultra in the first 6 months. If resale matters, the Galaxy holds value better — but the Pixel ships sooner on average across our Berlin and Toronto sellers.",
-};
-
-function pickResponse(text) {
-  const t = text.toLowerCase();
-  if (t.includes('listing') || t.includes('write')) return CANNED_RESPONSES.listing;
-  if (t.includes('check') || t.includes('before')) return CANNED_RESPONSES.bidding;
-  if (t.includes('compare') || t.includes('vs')) return CANNED_RESPONSES.compare;
-  return CANNED_RESPONSES.default;
-}
-
 export default function AIAssistant() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -53,16 +34,27 @@ export default function AIAssistant() {
     }
   }, [messages, thinking, open]);
 
-  const send = (text) => {
+  const send = async (text) => {
     const t = (text ?? input).trim();
     if (!t) return;
-    setMessages((m) => [...m, { role: 'user', text: t }]);
+    const nextMessages = [...messages, { role: 'user', text: t }];
+    setMessages(nextMessages);
     setInput('');
     setThinking(true);
-    setTimeout(() => {
-      setMessages((m) => [...m, { role: 'assistant', text: pickResponse(t) }]);
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: nextMessages }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'AI request failed');
+      setMessages((m) => [...m, { role: 'assistant', text: data.reply || "I couldn't generate a response. Try rephrasing?" }]);
+    } catch (err) {
+      setMessages((m) => [...m, { role: 'assistant', text: `Sorry — I hit an error: ${err.message}` }]);
+    } finally {
       setThinking(false);
-    }, 700);
+    }
   };
 
   return (
@@ -91,7 +83,7 @@ export default function AIAssistant() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-semibold text-ink-900">Bidly AI</div>
-              <div className="text-[11px] text-ink-500">Auction copilot · POC responses</div>
+              <div className="text-[11px] text-ink-500">Auction copilot · GPT-4o-mini</div>
             </div>
             <button
               onClick={() => setOpen(false)}

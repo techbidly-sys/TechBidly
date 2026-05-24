@@ -107,7 +107,12 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  const endsAt = new Date(Date.now() + Number(form.duration) * 24 * 3600 * 1000).toISOString();
+  const durationMs = form.duration === '1m'
+    ? 60 * 1000
+    : Number(form.duration) * 24 * 3600 * 1000;
+  const startAt = form.startAt ? new Date(form.startAt) : new Date();
+  const effectiveStart = isNaN(startAt.getTime()) ? new Date() : startAt;
+  const endsAt = new Date(effectiveStart.getTime() + durationMs).toISOString();
   const parts = (form.location ?? '').split(',');
   const city = parts[0]?.trim() ?? '';
   const country = parts.slice(1).join(',').trim();

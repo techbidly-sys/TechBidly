@@ -14,6 +14,8 @@ import {
   Info,
   Truck,
   Lock,
+  XCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import CountdownTimer from '@/components/CountdownTimer.jsx';
 import AuthBadge from '@/components/AuthBadge.jsx';
@@ -38,6 +40,9 @@ export default function ListingDetail() {
   const [nowTs, setNowTs] = useState(Date.now());
   const [sellerLogo, setSellerLogo] = useState(null);
   const [sellerVerified, setSellerVerified] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -70,6 +75,7 @@ export default function ListingDetail() {
           ...prev,
           currentBid: Number(payload.new.current_bid),
           bids: payload.new.bid_count,
+          endsAt: payload.new.ends_at ?? prev.endsAt,
         } : prev);
       })
       .on('postgres_changes', {
@@ -122,6 +128,35 @@ export default function ListingDetail() {
 
   const handleToggleWatchlist = () => {
     setIsWatchlisted(toggleListingWatchlist(id));
+  };
+
+  const isSeller = session?.user?.id && listing?.seller_id && session.user.id === listing.seller_id;
+  const tooLateToCancel = listing?.endsAt
+    ? new Date(listing.endsAt).getTime() - nowTs < 2 * 60 * 60 * 1000
+    : false;
+
+  const handleCancel = async () => {
+    setCancelling(true);
+    setCancelError('');
+    try {
+      const res = await fetch(`/api/listings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCancelError(data.error ?? 'Failed to cancel listing');
+        setCancelConfirm(false);
+      } else {
+        router.push('/browse');
+      }
+    } catch {
+      setCancelError('Failed to cancel listing');
+      setCancelConfirm(false);
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const recent = recentBids;
@@ -255,7 +290,7 @@ export default function ListingDetail() {
                   ${listing.currentBid.toLocaleString()}
                 </div>
                 <div className="text-xs text-ink-500 mt-1">
-                  {listing.bids} bids · started at ${listing.startingBid.toLocaleString()} · qty {listing.quantity ?? 1}
+                  {listing.bids} bids · started at ${listing.startingBid.toLocaleString()}
                 </div>
               </div>
               <CountdownTimer endsAt={listing.endsAt} />
@@ -304,6 +339,51 @@ export default function ListingDetail() {
               </ul>
             )}
           </div>
+
+          {isSeller && !hasEnded && (
+            <div className="card p-5 border border-rose-100">
+              <div className="flex items-center gap-2 text-rose-700 font-semibold text-sm">
+                <XCircle size={15} /> Cancel auction
+              </div>
+              {tooLateToCancel ? (
+                <p className="mt-2 text-sm text-ink-500 leading-relaxed">
+                  Cancellation is not allowed in the last 2 hours of an auction.
+                </p>
+              ) : (
+                <>
+                  {cancelError && (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-rose-600 bg-rose-50 rounded-lg px-3 py-2">
+                      <AlertTriangle size={13} className="shrink-0" /> {cancelError}
+                    </div>
+                  )}
+                  {cancelConfirm ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-sm text-ink-700">This will immediately remove the listing. Bidders will be notified. This cannot be undone.</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleCancel}
+                          disabled={cancelling}
+                          className="btn-outline text-sm border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                        >
+                          {cancelling ? 'Cancelling…' : 'Yes, cancel it'}
+                        </button>
+                        <button onClick={() => setCancelConfirm(false)} className="btn-outline text-sm">
+                          Go back
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setCancelConfirm(true)}
+                      className="mt-3 btn-outline w-full text-sm border-rose-200 text-rose-700 hover:bg-rose-50"
+                    >
+                      Cancel this auction
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           <div className="card p-5 bg-mesh-1">
             <div className="flex items-center gap-2 text-brand-700 font-semibold text-sm">

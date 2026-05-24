@@ -8,10 +8,8 @@ import {
   Gavel,
   TrendingUp,
   Clock,
-  Zap,
   ShieldCheck,
   CheckCircle2,
-  Activity,
   ToggleLeft,
   ToggleRight,
   AlertTriangle,
@@ -19,63 +17,50 @@ import {
   ChevronUp,
   Store,
   CreditCard,
+  Crown,
+  Swords,
+  Target,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext.jsx';
 
-const STRATEGIES = [
-  {
-    id: 'sniper',
-    label: 'Sniper',
-    icon: Zap,
-    desc: 'Bids in the final 90 seconds. Historically wins 18% cheaper.',
-    selectedBorder: 'border-brand-500',
-    selectedBg: 'bg-brand-50',
-    selectedIcon: 'text-brand-600',
-  },
-  {
-    id: 'balanced',
-    label: 'Balanced',
-    icon: Activity,
-    desc: 'Bids at T-1h then again at T-5min if outbid.',
-    selectedBorder: 'border-orange-400',
-    selectedBg: 'bg-orange-50',
-    selectedIcon: 'text-orange-500',
-  },
-  {
-    id: 'conservative',
-    label: 'Conservative',
-    icon: ShieldCheck,
-    desc: 'Bids now and defends lead in real time.',
-    selectedBorder: 'border-emerald-500',
-    selectedBg: 'bg-emerald-50',
-    selectedIcon: 'text-emerald-600',
-  },
-];
+// Returns the next counter-bid: current + max(5%, $25), rounded to nearest dollar
+function apexNextBid(currentBid) {
+  return Math.round(currentBid + Math.max(currentBid * 0.05, 25));
+}
 
-// Sniper wins cheaper but is riskier; conservative defends position more reliably.
-const STRATEGY_MULTIPLIER = { sniper: 0.82, balanced: 1.0, conservative: 1.18 };
+// Build the full bid ladder from currentBid up to maxBid
+function buildLadder(currentBid, maxBid) {
+  const steps = [];
+  let bid = currentBid;
+  while (true) {
+    const next = apexNextBid(bid);
+    if (next > maxBid) break;
+    steps.push(next);
+    bid = next;
+    if (steps.length >= 8) break; // cap preview at 8 steps
+  }
+  return steps;
+}
 
-function winProbability(maxBid, currentBid, comparables, strategy = 'balanced') {
+function winProbability(maxBid, currentBid, comparables) {
   if (maxBid <= currentBid) return 0;
   const median = comparables[Math.floor(comparables.length / 2)];
   if (!median || median <= currentBid) return 0;
-  const base = ((maxBid - currentBid) / (median - currentBid)) * 75;
-  const adjusted = base * (STRATEGY_MULTIPLIER[strategy] ?? 1.0);
-  return Math.min(95, Math.max(2, Math.round(adjusted)));
+  const base = ((maxBid - currentBid) / (median - currentBid)) * 85;
+  return Math.min(99, Math.max(2, Math.round(base)));
 }
 
 export default function SmartBidAgent({ listing, buyerId, onBidPlaced, auctionEnded = false, auctionResult = null }) {
   const { role } = useAuth();
   const [cardChecked, setCardChecked] = useState(false);
   const [hasCard, setHasCard] = useState(false);
-  const [maxBid, setMaxBid] = useState(Math.round(listing.currentBid * 1.07));
-  const [strategy, setStrategy] = useState('sniper');
+  const [maxBid, setMaxBid] = useState(Math.round(listing.currentBid * 1.15));
   const [mode, setMode] = useState('manual'); // manual | setup | armed
-  const [showComps, setShowComps] = useState(false);
+  const [showLadder, setShowLadder] = useState(false);
   const [agentStatus, setAgentStatus] = useState('leading');
   const [manualBid, setManualBid] = useState(listing.currentBid + 5);
-  const [placedAmount, setPlacedAmount] = useState(null); // null = not placed
+  const [placedAmount, setPlacedAmount] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [bidError, setBidError] = useState('');
 
@@ -91,15 +76,15 @@ export default function SmartBidAgent({ listing, buyerId, onBidPlaced, auctionEn
     }).catch(() => setCardChecked(true));
   }, [role, listing.id, buyerId]);
 
-  // Simulate agent status ticking while armed
+  // Cycle status while armed to simulate live defense
   useEffect(() => {
     if (mode !== 'armed') return;
-    const statuses = ['leading', 'monitoring', 'leading'];
+    const sequence = ['leading', 'monitoring', 'leading', 'leading', 'monitoring'];
     let i = 0;
     const id = setInterval(() => {
-      i = (i + 1) % statuses.length;
-      setAgentStatus(statuses[i]);
-    }, 4000);
+      i = (i + 1) % sequence.length;
+      setAgentStatus(sequence[i]);
+    }, 3500);
     return () => clearInterval(id);
   }, [mode]);
 
@@ -137,10 +122,7 @@ export default function SmartBidAgent({ listing, buyerId, onBidPlaced, auctionEn
             TechBidly uses it to settle winning bids automatically.
           </div>
         </div>
-        <Link
-          href="/profile?tab=billing"
-          className="btn-brand inline-flex mx-auto"
-        >
+        <Link href="/profile?tab=billing" className="btn-brand inline-flex mx-auto">
           <CreditCard size={15} /> Add a payment card
         </Link>
       </div>
@@ -164,9 +146,10 @@ export default function SmartBidAgent({ listing, buyerId, onBidPlaced, auctionEn
   }
 
   const minNext = listing.currentBid + 5;
-
-  const prob = winProbability(maxBid, listing.currentBid, listing.comparables ?? [], strategy);
+  const prob = winProbability(maxBid, listing.currentBid, listing.comparables ?? []);
   const aiSuggestion = Math.round(listing.comparables?.[1] ?? listing.currentBid * 1.06);
+  const nextCounterBid = apexNextBid(listing.currentBid);
+  const ladder = buildLadder(listing.currentBid, maxBid);
 
   const armAgent = () => {
     if (maxBid < minNext) return;
@@ -211,14 +194,22 @@ export default function SmartBidAgent({ listing, buyerId, onBidPlaced, auctionEn
   }
 
   if (mode === 'armed') {
-    return <AgentArmed listing={listing} maxBid={maxBid} strategy={strategy} status={agentStatus} onDisarm={() => setMode('setup')} />;
+    return (
+      <ApexArmed
+        listing={listing}
+        maxBid={maxBid}
+        status={agentStatus}
+        ladder={ladder}
+        onDisarm={() => setMode('setup')}
+      />
+    );
   }
 
   return (
     <div className="space-y-4">
       {/* Manual bid */}
       <form onSubmit={placeBid} className="space-y-3">
-        <span className="label">Your max bid</span>
+        <span className="label">Your bid</span>
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-500 font-semibold">$</span>
@@ -256,16 +247,16 @@ export default function SmartBidAgent({ listing, buyerId, onBidPlaced, auctionEn
         </div>
       </form>
 
-      {/* Smart Agent toggle */}
+      {/* Apex Mode toggle */}
       <div className="rounded-2xl border border-ink-100 overflow-hidden">
         <button
           onClick={() => setMode(mode === 'setup' ? 'manual' : 'setup')}
           className="w-full flex items-center justify-between px-4 py-3 bg-mesh-1 hover:opacity-95 transition"
         >
           <div className="flex items-center gap-2 text-brand-700 font-semibold text-sm">
-            <Bot size={16} />
-            Smart Bid Agent
-            <span className="chip bg-brand-100 text-brand-700 text-[10px] py-0.5">NEW</span>
+            <Crown size={16} />
+            Apex Mode
+            <span className="chip bg-brand-100 text-brand-700 text-[10px] py-0.5">AUTO-WIN</span>
           </div>
           {mode === 'setup'
             ? <ToggleRight size={22} className="text-brand-600" />
@@ -274,39 +265,35 @@ export default function SmartBidAgent({ listing, buyerId, onBidPlaced, auctionEn
 
         {mode === 'setup' && (
           <div className="p-4 border-t border-ink-100 space-y-4">
-            <p className="text-xs text-ink-600 leading-relaxed">
-              Set a max bid and choose a strategy. The agent bids automatically at the optimal moment so you don't have to watch the clock.
-            </p>
-
-            {/* Strategy picker */}
-            <div>
-              <span className="label">Strategy</span>
-              <div className="grid grid-cols-3 gap-2">
-                {STRATEGIES.map(({ id, label, icon: Icon, desc, selectedBorder, selectedBg, selectedIcon }) => {
-                  const isSelected = strategy === id;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setStrategy(id)}
-                      className={`rounded-xl border p-3 text-left transition ${
-                        isSelected
-                          ? `${selectedBorder} ${selectedBg}`
-                          : 'border-ink-200 hover:border-ink-300 bg-white'
-                      }`}
-                    >
-                      <Icon size={16} className={`mb-1.5 ${isSelected ? selectedIcon : 'text-ink-500'}`} />
-                      <div className={`text-xs font-semibold ${isSelected ? 'text-ink-900' : 'text-ink-700'}`}>{label}</div>
-                      <div className="text-[10px] text-ink-500 mt-0.5 leading-tight">{desc}</div>
-                    </button>
-                  );
-                })}
+            {/* Strategy description */}
+            <div className="rounded-xl bg-gradient-to-br from-brand-50 to-purple-50 border border-brand-100 p-3 flex items-start gap-3">
+              <div className="h-8 w-8 rounded-lg bg-brand-600 grid place-items-center shrink-0">
+                <Crown size={16} className="text-white" />
+              </div>
+              <div>
+                <div className="text-sm font-bold text-brand-900">Guaranteed Win Strategy</div>
+                <div className="text-xs text-brand-700 mt-0.5 leading-relaxed">
+                  Set your max bid. Every time you're outbid, Apex automatically counters with the current bid +5% or +$25 (whichever is more). It defends your lead relentlessly until someone exceeds your max — then you're notified.
+                </div>
               </div>
             </div>
 
-            {/* Max bid + win probability */}
+            {/* How it works pills */}
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2.5 py-1 font-medium">
+                <Swords size={10} /> Outbid → counter in seconds
+              </span>
+              <span className="inline-flex items-center gap-1 text-[11px] bg-brand-50 text-brand-700 border border-brand-100 rounded-full px-2.5 py-1 font-medium">
+                <ShieldCheck size={10} /> Defends lead 24/7
+              </span>
+              <span className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-2.5 py-1 font-medium">
+                <Target size={10} /> +5% or +$25 per counter
+              </span>
+            </div>
+
+            {/* Max bid input */}
             <div>
-              <span className="label">Agent max bid</span>
+              <span className="label">Maximum bid (your ceiling)</span>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-500 font-semibold">$</span>
                 <input
@@ -321,18 +308,24 @@ export default function SmartBidAgent({ listing, buyerId, onBidPlaced, auctionEn
               <WinProbBar prob={prob} />
             </div>
 
-            {/* Comparables toggle */}
+            {/* Bid ladder preview */}
             <button
               type="button"
-              onClick={() => setShowComps((v) => !v)}
+              onClick={() => setShowLadder((v) => !v)}
               className="flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:underline"
             >
               <TrendingUp size={13} />
-              {showComps ? 'Hide' : 'Show'} comparable closes
-              {showComps ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              {showLadder ? 'Hide' : 'Preview'} counter-bid ladder
+              {showLadder ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
             </button>
 
-            {showComps && <ComparableCloses listing={listing} />}
+            {showLadder && <BidLadder currentBid={listing.currentBid} ladder={ladder} maxBid={maxBid} />}
+
+            {ladder.length === 0 && maxBid > listing.currentBid && (
+              <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                Max bid is less than one counter-bid increment above the current price. Raise it to give Apex room to defend.
+              </p>
+            )}
 
             <button
               type="button"
@@ -340,7 +333,7 @@ export default function SmartBidAgent({ listing, buyerId, onBidPlaced, auctionEn
               disabled={maxBid < minNext}
               className="btn-brand w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Bot size={16} /> Bid with agent · ${maxBid.toLocaleString()}
+              <Crown size={16} /> Activate Apex Mode · max ${maxBid.toLocaleString()}
             </button>
           </div>
         )}
@@ -350,10 +343,8 @@ export default function SmartBidAgent({ listing, buyerId, onBidPlaced, auctionEn
 }
 
 function WinProbBar({ prob }) {
-  const color =
-    prob >= 70 ? 'bg-emerald-500' : prob >= 40 ? 'bg-brand-500' : 'bg-amber-400';
-  const label =
-    prob >= 70 ? 'High' : prob >= 40 ? 'Moderate' : 'Low';
+  const color = prob >= 70 ? 'bg-emerald-500' : prob >= 40 ? 'bg-brand-500' : 'bg-amber-400';
+  const label = prob >= 70 ? 'High' : prob >= 40 ? 'Moderate' : 'Low';
 
   return (
     <div className="mt-2">
@@ -371,63 +362,60 @@ function WinProbBar({ prob }) {
   );
 }
 
-function ComparableCloses({ listing }) {
-  const comps = listing.comparables ?? [];
-  if (comps.length === 0) return null;
-  const max = Math.max(...comps);
+function BidLadder({ currentBid, ladder, maxBid }) {
+  if (ladder.length === 0) return null;
+  const final = ladder[ladder.length - 1];
+
   return (
-    <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-3">
+    <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-3 space-y-1.5">
       <div className="text-[11px] uppercase tracking-wider text-ink-400 font-semibold mb-2">
-        Last {comps.length} comparable closes
+        Counter-bid ladder (up to ${maxBid.toLocaleString()})
       </div>
-      <div className="space-y-1.5">
-        {comps.map((price, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <div className="text-xs text-ink-500 w-4">{i + 1}</div>
-            <div className="flex-1 h-2 rounded-full bg-ink-100 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-brand-400 transition-all duration-500"
-                style={{ width: `${(price / max) * 100}%` }}
-              />
-            </div>
-            <div className="text-xs font-semibold text-ink-900 w-16 text-right">
-              ${price.toLocaleString()}
-            </div>
+      <div className="flex items-center gap-2 text-xs text-ink-500">
+        <span className="w-5 text-center font-semibold text-ink-400">—</span>
+        <span className="font-semibold text-ink-700">Current: ${currentBid.toLocaleString()}</span>
+      </div>
+      {ladder.map((step, i) => (
+        <div key={i} className="flex items-center gap-2 text-xs">
+          <span className="w-5 text-center text-[10px] font-bold text-brand-400">{i + 1}</span>
+          <div className="flex-1 h-1.5 rounded-full bg-ink-100 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-brand-400 transition-all duration-300"
+              style={{ width: `${(step / maxBid) * 100}%` }}
+            />
           </div>
-        ))}
-      </div>
-      <div className="mt-2 text-[10px] text-ink-400">
-        Median close: ${comps[Math.floor(comps.length / 2)].toLocaleString()} · AI suggested max: ${Math.round(comps[1] ?? listing.currentBid * 1.06).toLocaleString()}
+          <span className="font-semibold text-ink-900 w-16 text-right">${step.toLocaleString()}</span>
+        </div>
+      ))}
+      <div className="pt-1 text-[10px] text-ink-400">
+        {ladder.length === 8
+          ? `…and more counters available up to $${maxBid.toLocaleString()}`
+          : `Apex can place up to ${ladder.length} counter-bid${ladder.length !== 1 ? 's' : ''} · final at $${final.toLocaleString()}`}
       </div>
     </div>
   );
 }
 
-function AgentArmed({ listing, maxBid, strategy, status, onDisarm }) {
-  const strat = STRATEGIES.find((s) => s.id === strategy);
-  const Icon = strat?.icon ?? Bot;
-  const nextAction = {
-    sniper: 'Watching… will bid at T-90 seconds',
-    balanced: 'Bid placed · will re-bid at T-5min if outbid',
-    conservative: 'Leading bid held · defending in real time',
-  }[strategy];
-
+function ApexArmed({ listing, maxBid, status, ladder, onDisarm }) {
   const statusCfg = {
-    leading: { label: 'Leading', color: 'text-emerald-600', bg: 'bg-emerald-50', dot: 'bg-emerald-500' },
-    outbid: { label: 'Outbid — responding', color: 'text-rose-600', bg: 'bg-rose-50', dot: 'bg-rose-500' },
-    monitoring: { label: 'Monitoring', color: 'text-brand-600', bg: 'bg-brand-50', dot: 'bg-brand-500' },
+    leading:   { label: 'Leading',    color: 'text-emerald-600', bg: 'bg-emerald-50', dot: 'bg-emerald-500' },
+    outbid:    { label: 'Defending',  color: 'text-rose-600',    bg: 'bg-rose-50',    dot: 'bg-rose-500' },
+    monitoring:{ label: 'Monitoring', color: 'text-brand-600',   bg: 'bg-brand-50',   dot: 'bg-brand-500' },
   }[status] ?? { label: status, color: 'text-ink-700', bg: 'bg-ink-50', dot: 'bg-ink-400' };
+
+  const nextCounter = apexNextBid(listing.currentBid);
+  const canCounter = nextCounter <= maxBid;
 
   return (
     <div className="rounded-2xl border border-brand-200 bg-brand-50/40 overflow-hidden">
-      {/* Agent header */}
+      {/* Header */}
       <div className="px-4 py-3 bg-mesh-1 border-b border-brand-100 flex items-center justify-between">
         <div className="flex items-center gap-2 font-semibold text-brand-700">
           <div className="relative">
-            <Bot size={18} />
+            <Crown size={18} />
             <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white" />
           </div>
-          Smart Bid Agent · Armed
+          Apex Mode · Armed
         </div>
         <span className={`chip text-xs font-semibold ${statusCfg.bg} ${statusCfg.color}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${statusCfg.dot} animate-pulse`} />
@@ -436,54 +424,81 @@ function AgentArmed({ listing, maxBid, strategy, status, onDisarm }) {
       </div>
 
       <div className="p-4 space-y-3">
+        {/* Stats grid */}
         <div className="grid grid-cols-2 gap-3">
-          <AgentStat
-            icon={Gavel}
-            label="Max bid"
-            value={`$${maxBid.toLocaleString()}`}
-          />
-          <AgentStat
-            icon={Icon}
-            label="Strategy"
-            value={strat?.label ?? strategy}
+          <ApexStat icon={Target} label="Your ceiling" value={`$${maxBid.toLocaleString()}`} />
+          <ApexStat
+            icon={ShieldCheck}
+            label="Next counter"
+            value={canCounter ? `$${nextCounter.toLocaleString()}` : 'At ceiling'}
+            valueClass={canCounter ? 'text-emerald-700' : 'text-rose-600'}
           />
         </div>
 
+        {/* Defense rule */}
         <div className="rounded-xl bg-white border border-brand-100 px-3 py-2.5 flex items-center gap-2">
-          <Clock size={14} className="text-brand-500 shrink-0" />
-          <span className="text-xs text-ink-700">{nextAction}</span>
+          <Swords size={14} className="text-brand-500 shrink-0" />
+          <span className="text-xs text-ink-700">
+            Countering every bid with <b>+5% or +$25</b>, whichever is more
+          </span>
         </div>
+
+        {/* Ladder preview (compact) */}
+        {ladder.length > 0 && (
+          <div className="rounded-xl bg-white border border-brand-100 px-3 py-2.5">
+            <div className="text-[10px] uppercase tracking-wide text-ink-400 font-semibold mb-1.5">
+              Remaining counters
+            </div>
+            <div className="flex items-end gap-1 h-8">
+              {ladder.slice(0, 10).map((step, i) => (
+                <div
+                  key={i}
+                  className="flex-1 rounded-sm bg-brand-200 transition-all"
+                  style={{ height: `${20 + (i / ladder.length) * 80}%` }}
+                  title={`$${step.toLocaleString()}`}
+                />
+              ))}
+            </div>
+            <div className="text-[10px] text-ink-400 mt-1">
+              {ladder.length} counter{ladder.length !== 1 ? 's' : ''} available · ceiling ${maxBid.toLocaleString()}
+            </div>
+          </div>
+        )}
 
         <div className="rounded-xl bg-white border border-brand-100 px-3 py-2.5 flex items-center gap-2">
           <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
           <span className="text-xs text-ink-700">
-            You'll be notified immediately if outbid beyond your max.
+            You'll be notified if someone bids beyond your ceiling.
           </span>
         </div>
 
+        {!canCounter && (
+          <div className="flex items-center gap-2 text-[11px] text-rose-700 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
+            <AlertTriangle size={12} className="text-rose-500 shrink-0" />
+            Current price is at your ceiling — raise your max bid to keep defending.
+          </div>
+        )}
+
         <div className="flex items-center gap-2 text-[11px] text-ink-500 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
           <AlertTriangle size={12} className="text-amber-500 shrink-0" />
-          Agent active — do not place manual bids while armed.
+          Apex is active — avoid placing manual bids while armed.
         </div>
 
-        <button
-          onClick={onDisarm}
-          className="btn-outline w-full text-xs"
-        >
-          Disarm agent
+        <button onClick={onDisarm} className="btn-outline w-full text-xs">
+          Disarm Apex
         </button>
       </div>
     </div>
   );
 }
 
-function AgentStat({ icon: Icon, label, value }) {
+function ApexStat({ icon: Icon, label, value, valueClass = 'text-ink-900' }) {
   return (
     <div className="rounded-xl bg-white border border-brand-100 px-3 py-2.5">
       <div className="flex items-center gap-1.5 text-[11px] text-ink-500 mb-1">
         <Icon size={12} /> {label}
       </div>
-      <div className="font-semibold text-ink-900 text-sm">{value}</div>
+      <div className={`font-semibold text-sm ${valueClass}`}>{value}</div>
     </div>
   );
 }

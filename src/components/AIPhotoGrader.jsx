@@ -16,7 +16,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 
-// Sequence of analysis steps to animate through.
+// Sequence of analysis steps to animate through while the request is in flight.
 const STEPS = [
   { icon: Camera, label: 'Detecting device model…' },
   { icon: ScanLine, label: 'Grading condition from photos…' },
@@ -24,58 +24,56 @@ const STEPS = [
   { icon: Sparkles, label: 'Generating price estimate…' },
 ];
 
-// Deterministic mock result based on whichever file was "uploaded".
-function buildResult() {
-  return {
-    device: 'iPhone 15 Pro Max — 256 GB Natural Titanium',
-    condition: 'Excellent',
-    conditionConfidence: 94,
-    issues: ['Minor scuff detected on bottom-left corner', 'Charging port area shows light wear'],
-    bidRange: { low: 840, high: 970 },
-    suggestedStart: 620,
-    fraudScore: 91,
-    checks: [
-      { label: 'Original photos', pass: true },
-      { label: 'No AI-generated images', pass: true },
-      { label: 'No stock photo match', pass: true },
-      { label: 'Metadata consistent', pass: true },
-    ],
-    description:
-      'Used for approximately 4–6 months based on wear pattern. Screen appears pristine; minor cosmetic wear on chassis. Battery indicator suggests health above 90%. Includes what appears to be the original box in background.',
-  };
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function AIPhotoGrader({ onApply }) {
-  const [phase, setPhase] = useState('idle'); // idle | analyzing | done
+  const [phase, setPhase] = useState('idle'); // idle | analyzing | done | error
   const [stepIdx, setStepIdx] = useState(0);
   const [result, setResult] = useState(null);
   const [expanded, setExpanded] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
   const inputRef = useRef(null);
 
-  const handleFiles = (files) => {
+  const handleFiles = async (files) => {
     if (!files || files.length === 0) return;
-    const url = URL.createObjectURL(files[0]);
+    const fileArray = Array.from(files).slice(0, 6);
+    const url = URL.createObjectURL(fileArray[0]);
     setPreviewUrl(url);
-    runAnalysis();
-  };
-
-  const runAnalysis = () => {
     setPhase('analyzing');
     setStepIdx(0);
-    let i = 0;
-    const tick = () => {
-      i++;
-      if (i < STEPS.length) {
-        setStepIdx(i);
-        setTimeout(tick, 700);
-      } else {
-        setResult(buildResult());
-        setPhase('done');
-        setExpanded(true);
-      }
-    };
-    setTimeout(tick, 700);
+    setErrorMsg('');
+
+    // Step animation runs in parallel with the actual request.
+    const stepTimer = setInterval(() => {
+      setStepIdx((i) => Math.min(i + 1, STEPS.length - 1));
+    }, 900);
+
+    try {
+      const dataUrls = await Promise.all(fileArray.map(fileToDataUrl));
+      const res = await fetch('/api/ai/photo-grade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images: dataUrls }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'AI grading failed');
+      setResult(data.result);
+      setPhase('done');
+      setExpanded(true);
+    } catch (err) {
+      setErrorMsg(err.message ?? 'Photo grading failed');
+      setPhase('error');
+    } finally {
+      clearInterval(stepTimer);
+    }
   };
 
   // Cleanup object URLs on unmount.
@@ -151,6 +149,22 @@ export default function AIPhotoGrader({ onApply }) {
         </div>
       )}
 
+      {phase === 'error' && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 space-y-3">
+          <div className="flex items-center gap-2 text-rose-700 font-semibold text-sm">
+            <AlertTriangle size={16} />
+            AI grading failed
+          </div>
+          <p className="text-xs text-rose-700">{errorMsg}</p>
+          <button
+            onClick={() => { setPhase('idle'); setResult(null); setPreviewUrl(null); setErrorMsg(''); }}
+            className="btn-outline text-xs"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
       {phase === 'done' && result && (
         <div className="rounded-2xl border border-ink-100 bg-white overflow-hidden">
           {/* Header row */}
@@ -184,19 +198,19 @@ export default function AIPhotoGrader({ onApply }) {
               value={
                 <span>
                   <span className="font-display text-xl font-bold text-ink-900">${result.suggestedStart}</span>
-                  <span className="text-xs text-ink-500 ml-1">est. closes ${result.bidRange.low}–${result.bidRange.high}</span>
+                  <span className="text-xs text-ink-500 ml-1">est. closes ${result.bidRange?.low ?? '—'}–${result.bidRange?.high ?? '—'}</span>
                 </span>
               }
             />
           </div>
 
           {/* Issues detected */}
-          {result.issues.length > 0 && (
+          {(result.issues ?? []).length > 0 && (
             <div className="px-4 pb-3">
               <div className="text-[11px] uppercase tracking-wider text-ink-400 font-semibold mb-2">Wear detected</div>
               <div className="flex flex-wrap gap-2">
-                {result.issues.map((issue) => (
-                  <span key={issue} className="chip bg-amber-50 text-amber-700 border border-amber-100">
+                {result.issues.map((issue, i) => (
+                  <span key={i} className="chip bg-amber-50 text-amber-700 border border-amber-100">
                     <AlertTriangle size={11} /> {issue}
                   </span>
                 ))}
@@ -211,14 +225,14 @@ export default function AIPhotoGrader({ onApply }) {
           >
             <span className="flex items-center gap-2">
               <ShieldCheck size={15} className="text-emerald-500" />
-              Photo authenticity · Fraud score {result.fraudScore}/100
+              Photo authenticity · Fraud score {result.fraudScore ?? '—'}/100
             </span>
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
 
           {expanded && (
             <div className="px-4 pb-4 grid sm:grid-cols-2 gap-2">
-              {result.checks.map(({ label, pass }) => (
+              {(result.checks ?? []).map(({ label, pass }) => (
                 <div
                   key={label}
                   className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
@@ -230,7 +244,7 @@ export default function AIPhotoGrader({ onApply }) {
                 </div>
               ))}
               <div className="sm:col-span-2">
-                <FraudBar score={result.fraudScore} />
+                <FraudBar score={result.fraudScore ?? 0} />
               </div>
             </div>
           )}

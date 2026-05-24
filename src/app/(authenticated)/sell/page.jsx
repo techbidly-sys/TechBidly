@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, Tag, Wand2, CheckCircle2, AlertCircle, CreditCard } from 'lucide-react';
+import { Tag, Wand2, CheckCircle2, AlertCircle, CreditCard } from 'lucide-react';
 import { categories, conditions } from '@/data/mockData.js';
 import AIPhotoGrader from '@/components/AIPhotoGrader.jsx';
+import ManifestUploader from '@/components/ManifestUploader.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { createListing } from '@/lib/listings.js';
 
@@ -17,23 +18,29 @@ export default function Sell() {
     if (profile && role !== 'seller') router.replace('/browse');
   }, [profile, role, router]);
 
-  const [form, setForm] = useState({
-    title: '',
-    category: 'phones',
-    condition: 'Like New',
-    quantity: 1,
-    startingBid: 200,
-    duration: '3',
-    description: '',
-    location: profile?.role === 'seller' ? '' : 'Toronto, Canada',
-    imageUrl: '',
-    tags: '',
+  const [form, setForm] = useState(() => {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const defaultStartAt = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    return {
+      title: '',
+      category: 'phones',
+      condition: 'Like New',
+      startingBid: 200,
+      duration: '3',
+      description: '',
+      location: profile?.role === 'seller' ? '' : 'Toronto, Canada',
+      imageUrl: '',
+      tags: '',
+      startAt: defaultStartAt,
+    };
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(null);
   const [error, setError] = useState('');
   const [cardChecked, setCardChecked] = useState(false);
   const [hasCard, setHasCard] = useState(false);
+  const [drafting, setDrafting] = useState(false);
 
   useEffect(() => {
     fetch('/api/stripe/payment-methods')
@@ -47,13 +54,32 @@ export default function Sell() {
 
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  const aiDraft = () => {
-    setForm((f) => ({
-      ...f,
-      title: f.title || 'iPhone 15 Pro Max — 256GB Natural Titanium',
-      description: f.description || 'Used for 3 months in a case with screen protector. Battery health 100%. Includes original box, USB-C cable, and unused EarPods adapter. Ships next-day with tracking and signature.',
-      startingBid: f.startingBid || 600,
-    }));
+  const aiDraft = async () => {
+    setDrafting(true);
+    try {
+      const res = await fetch('/api/ai/listing-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: form.category,
+          condition: form.condition,
+          hint: form.title || form.description || '',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'AI draft failed');
+      const draft = data.draft ?? {};
+      setForm((f) => ({
+        ...f,
+        title: f.title || draft.title || f.title,
+        description: f.description || draft.description || f.description,
+        startingBid: f.startingBid || Number(draft.startingBid) || f.startingBid,
+      }));
+    } catch (err) {
+      setError(err.message ?? 'AI draft failed');
+    } finally {
+      setDrafting(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -93,7 +119,9 @@ export default function Sell() {
           <button
             onClick={() => {
               setSubmitted(null);
-              setForm({ title: '', category: 'phones', condition: 'Like New', quantity: 1, startingBid: 200, duration: '3', description: '', location: '', imageUrl: '', tags: '' });
+              const now = new Date();
+              const pad = (n) => String(n).padStart(2, '0');
+              setForm({ title: '', category: 'phones', condition: 'Like New', startingBid: 200, duration: '3', description: '', location: '', imageUrl: '', tags: '', startAt: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}` });
             }}
             className="btn-outline"
           >
@@ -137,7 +165,7 @@ export default function Sell() {
   }
 
   return (
-    <div className="grid lg:grid-cols-[1fr,340px] gap-6">
+    <div className="max-w-3xl mx-auto">
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <h1 className="font-display text-3xl font-bold">Sell on TechBidly</h1>
@@ -155,6 +183,22 @@ export default function Sell() {
                 condition: result.condition,
                 startingBid: result.startingBid,
                 description: f.description || result.description,
+              }))
+            }
+          />
+
+          <ManifestUploader
+            onApply={(fields) =>
+              setForm((f) => ({
+                ...f,
+                ...(fields.title       && { title:       fields.title }),
+                ...(fields.category    && { category:    fields.category }),
+                ...(fields.condition   && { condition:   fields.condition }),
+                ...(fields.startingBid && { startingBid: Number(fields.startingBid) || f.startingBid }),
+                ...(fields.description && { description: fields.description }),
+                ...(fields.location    && { location:    fields.location }),
+                ...(fields.imageUrl    && { imageUrl:    fields.imageUrl }),
+                ...(fields.tags        && { tags:        fields.tags }),
               }))
             }
           />
@@ -179,10 +223,6 @@ export default function Sell() {
               </select>
             </div>
             <div>
-              <span className="label">Quantity</span>
-              <input type="number" value={form.quantity} onChange={update('quantity')} min={1} className="input" required />
-            </div>
-            <div>
               <span className="label">Seller location</span>
               <input value={form.location} onChange={update('location')} className="input" placeholder="City, Country" required />
             </div>
@@ -196,11 +236,22 @@ export default function Sell() {
             <div>
               <span className="label">Auction duration</span>
               <select value={form.duration} onChange={update('duration')} className="input cursor-pointer">
+                <option value="1m">1 minute (demo)</option>
                 <option value="1">1 day</option>
                 <option value="3">3 days</option>
                 <option value="5">5 days</option>
                 <option value="7">7 days</option>
               </select>
+            </div>
+            <div>
+              <span className="label">Auction start</span>
+              <input
+                type="datetime-local"
+                value={form.startAt}
+                onChange={update('startAt')}
+                className="input"
+                required
+              />
             </div>
             <div className="sm:col-span-2">
               <span className="label">Image URL</span>
@@ -215,8 +266,13 @@ export default function Sell() {
           <div>
             <div className="flex items-center justify-between">
               <span className="label !mb-0">Description</span>
-              <button type="button" onClick={aiDraft} className="text-xs font-semibold text-brand-700 inline-flex items-center gap-1 hover:underline">
-                <Wand2 size={12} /> Draft with Bidly AI
+              <button
+                type="button"
+                onClick={aiDraft}
+                disabled={drafting}
+                className="text-xs font-semibold text-brand-700 inline-flex items-center gap-1 hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Wand2 size={12} /> {drafting ? 'Drafting…' : 'Draft with Bidly AI'}
               </button>
             </div>
             <textarea
@@ -244,35 +300,6 @@ export default function Sell() {
           </button>
         </div>
       </form>
-
-      <aside className="space-y-4 lg:sticky lg:top-20 self-start">
-        <div className="card p-5 bg-mesh-1">
-          <div className="flex items-center gap-2 text-brand-700 font-semibold">
-            <Sparkles size={16}/> Bidly AI suggestions
-          </div>
-          <ul className="mt-3 text-sm text-ink-700 space-y-2 leading-relaxed">
-            <li>• Suggested starting bid: <b>$580–$640</b> based on 12 similar closings.</li>
-            <li>• Add <b>battery cycles</b> and <b>IMEI status</b> — improves bid count by ~22%.</li>
-            <li>• 5pm–8pm local time is the best listing window for phones.</li>
-          </ul>
-          <button
-            type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent('open-ai-assistant'))}
-            className="btn-primary w-full mt-4 text-xs"
-          >
-            Open Bidly AI
-          </button>
-        </div>
-
-        <div className="card p-5">
-          <div className="font-semibold">Fees</div>
-          <ul className="mt-2 text-sm text-ink-600 space-y-1.5">
-            <li className="flex justify-between"><span>Listing fee</span><span className="text-ink-900 font-semibold">Free</span></li>
-            <li className="flex justify-between"><span>Final value</span><span className="text-ink-900 font-semibold">5%</span></li>
-            <li className="flex justify-between"><span>Payout</span><span className="text-ink-900 font-semibold">2–4 days</span></li>
-          </ul>
-        </div>
-      </aside>
     </div>
   );
 }

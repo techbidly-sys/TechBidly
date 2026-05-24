@@ -91,6 +91,16 @@ export async function POST(request) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
+  // Anti-sniping: if the bid lands within the last 5 minutes, extend the auction by 5 minutes
+  const SNIPE_WINDOW_MS = 5 * 60 * 1000;
+  const msRemaining = new Date(listing.ends_at).getTime() - Date.now();
+  if (msRemaining > 0 && msRemaining < SNIPE_WINDOW_MS) {
+    await supabaseAdmin
+      .from('listings')
+      .update({ ends_at: new Date(Date.now() + SNIPE_WINDOW_MS).toISOString() })
+      .eq('id', Number(listingId));
+  }
+
   const listingTitle = listing.title ?? 'an item';
   const formattedAmount = numericAmount;
 

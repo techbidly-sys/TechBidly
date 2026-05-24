@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, Tag, PackageCheck, Shield, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Tag, PackageCheck, Gavel, Shield, LogOut } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { Logo } from './Sidebar.jsx';
 
@@ -10,6 +10,7 @@ const ADMIN_LINKS = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/listings', label: 'Listings', icon: Tag },
+  { to: '/admin/bids', label: 'Active Bids', icon: Gavel },
   { to: '/admin/orders', label: 'Orders', icon: PackageCheck },
 ];
 
