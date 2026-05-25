@@ -102,7 +102,6 @@ export async function POST(request) {
   }
 
   const listingTitle = listing.title ?? 'an item';
-  const formattedAmount = numericAmount;
 
   const notificationsToInsert = [
     {
@@ -132,9 +131,9 @@ export async function POST(request) {
   }
 
   // Fire-and-forget email notifications
-  emailNotify.bidPlaced(user.id, listingTitle, formattedAmount).catch(() => {});
+  emailNotify.bidPlaced(user.id, listingTitle, numericAmount).catch(() => {});
   if (prevTopBid && prevTopBid.buyer_id !== user.id) {
-    emailNotify.outbid(prevTopBid.buyer_id, listingTitle, formattedAmount).catch(() => {});
+    emailNotify.outbid(prevTopBid.buyer_id, listingTitle, numericAmount).catch(() => {});
   }
 
   return NextResponse.json({ bid: data });

@@ -167,7 +167,7 @@ export async function GET() {
         bidStatus = 'shipped';
       }
       if (isWinner && mapped.status === 'delivered') {
-        bidStatus = 'shipped';
+        bidStatus = 'delivered';
       }
     } else if (Math.abs(userMaxBid - topAmount) < 0.0001) {
       bidStatus = 'highest_bidder';

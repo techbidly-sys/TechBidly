@@ -40,19 +40,22 @@ export function AuthProvider({ children }) {
 
         // Restore active role from localStorage
         const saved = localStorage.getItem(ROLE_KEY(session.user.id));
+        let resolvedRole = null;
         if (saved && userProfiles.some((p) => p.role === saved)) {
           setActiveRole(saved);
+          resolvedRole = saved;
         } else if (userProfiles.length === 1) {
           // Only one profile — activate it automatically
           setActiveRole(userProfiles[0].role);
           localStorage.setItem(ROLE_KEY(session.user.id), userProfiles[0].role);
+          resolvedRole = userProfiles[0].role;
         }
         // Two profiles with no saved role → needsRolePicker will be true
 
         setProfilesLoading(false);
 
-        // Ensure Stripe customer for each profile on first load
-        const active = userProfiles.find((p) => p.role === activeRole) ?? userProfiles[0];
+        // Use locally-resolved role instead of stale state (setActiveRole above hasn't committed yet)
+        const active = userProfiles.find((p) => p.role === resolvedRole) ?? userProfiles[0];
         if (active && !active.stripe_customer_id) {
           await fetch('/api/stripe/customer/ensure', { method: 'POST' });
         }

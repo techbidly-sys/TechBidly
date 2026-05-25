@@ -83,7 +83,7 @@ export default function AIAssistant() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-semibold text-ink-900">Bidly AI</div>
-              <div className="text-[11px] text-ink-500">Auction copilot · GPT-4o-mini</div>
+              <div className="text-[11px] text-ink-500">Auction copilot · gpt-5.4-mini</div>
             </div>
             <button
               onClick={() => setOpen(false)}

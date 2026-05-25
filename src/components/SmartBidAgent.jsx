@@ -66,14 +66,17 @@ export default function SmartBidAgent({ listing, buyerId, onBidPlaced, auctionEn
 
   useEffect(() => {
     if (role !== 'buyer') return;
+    let mounted = true;
     Promise.all([
       fetch('/api/stripe/payment-methods').then((r) => r.json()).catch(() => ({ methods: [] })),
       fetchUserBidForListing(listing.id, buyerId),
     ]).then(([data, existingBid]) => {
+      if (!mounted) return;
       setHasCard((data.methods ?? []).length > 0);
       if (existingBid !== null) setPlacedAmount(existingBid);
       setCardChecked(true);
-    }).catch(() => setCardChecked(true));
+    }).catch(() => { if (mounted) setCardChecked(true); });
+    return () => { mounted = false; };
   }, [role, listing.id, buyerId]);
 
   // Cycle status while armed to simulate live defense

@@ -29,7 +29,7 @@ export default function Sell() {
       startingBid: 200,
       duration: '3',
       description: '',
-      location: profile?.role === 'seller' ? '' : 'Toronto, Canada',
+      location: '',
       imageUrl: '',
       tags: '',
       startAt: defaultStartAt,
@@ -71,9 +71,9 @@ export default function Sell() {
       const draft = data.draft ?? {};
       setForm((f) => ({
         ...f,
-        title: f.title || draft.title || f.title,
-        description: f.description || draft.description || f.description,
-        startingBid: f.startingBid || Number(draft.startingBid) || f.startingBid,
+        title: draft.title || f.title,
+        description: draft.description || f.description,
+        startingBid: Number(draft.startingBid) || f.startingBid,
       }));
     } catch (err) {
       setError(err.message ?? 'AI draft failed');

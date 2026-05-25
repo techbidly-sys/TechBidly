@@ -32,14 +32,38 @@ function mapRow(rawRow) {
   return result;
 }
 
+function splitCSVLine(line) {
+  const values = [];
+  let i = 0;
+  while (i <= line.length) {
+    if (line[i] === '"') {
+      let val = '';
+      i++;
+      while (i < line.length) {
+        if (line[i] === '"' && line[i + 1] === '"') { val += '"'; i += 2; }
+        else if (line[i] === '"') { i++; break; }
+        else { val += line[i++]; }
+      }
+      values.push(val);
+      if (line[i] === ',') i++;
+    } else {
+      const end = line.indexOf(',', i);
+      if (end === -1) { values.push(line.slice(i).trim()); break; }
+      values.push(line.slice(i, end).trim());
+      i = end + 1;
+    }
+  }
+  return values;
+}
+
 function parseCSV(text) {
   const lines = text.trim().split(/\r?\n/);
   if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+  const headers = splitCSVLine(lines[0]).map((h) => h.trim());
   return lines.slice(1)
     .filter((l) => l.trim())
     .map((line) => {
-      const values = line.split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
+      const values = splitCSVLine(line);
       return Object.fromEntries(headers.map((h, i) => [h, values[i] ?? '']));
     });
 }

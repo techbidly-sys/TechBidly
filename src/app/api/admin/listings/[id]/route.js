@@ -7,7 +7,10 @@ export async function PATCH(request, { params }) {
   if (forbidden) return forbidden;
 
   const { action } = await request.json();
-  const { id } = params;
+  const numId = Number(params.id);
+  if (!Number.isFinite(numId)) {
+    return NextResponse.json({ error: 'Invalid listing id' }, { status: 400 });
+  }
 
   const updates = {
     feature:   { featured: true },
@@ -20,7 +23,7 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   }
 
-  const { error } = await supabaseAdmin.from('listings').update(updates[action]).eq('id', id);
+  const { error } = await supabaseAdmin.from('listings').update(updates[action]).eq('id', numId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

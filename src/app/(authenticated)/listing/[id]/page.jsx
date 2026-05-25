@@ -119,7 +119,7 @@ export default function ListingDetail() {
         setAuctionResult(data?.ended ? data.result : null);
       })
       .catch(() => setAuctionResult(null));
-  }, [id, listing?.currentBid, listing?.status]);
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
